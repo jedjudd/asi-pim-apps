@@ -12,7 +12,7 @@
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <!-- Chart.js (all-in-one UMD — no peer deps) -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-  <script src="https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js"></script>
+  <!-- MSAL loaded dynamically via esm.sh -->
 
   <style>
     :root {
@@ -484,9 +484,14 @@ const _LIST   = 'CAR Log';
 let _msalInstance = null;
 const _origFetch  = window.fetch.bind(window);
 
+let _msalModule = null;
 async function _getMsal() {
   if (!_msalInstance) {
-    _msalInstance = new msal.PublicClientApplication(_MSAL_CONFIG);
+    if (!_msalModule) {
+      _msalModule = await import('https://esm.sh/@azure/msal-browser@4');
+    }
+    const { PublicClientApplication } = _msalModule;
+    _msalInstance = new PublicClientApplication(_MSAL_CONFIG);
     await _msalInstance.initialize();
     // Intercept all /api/ calls and route to Graph API
     window.fetch = async (url, opts) => {
