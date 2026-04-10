@@ -1,0 +1,2115 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:mso="urn:schemas-microsoft-com:office:office" xmlns:msdt="uuid:C2F41010-65B3-11d1-A29F-00AA00C14882">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Document Compliance Matrix</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+<script src="https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+  :root {
+    --bg:      #f0f2f5;
+    --card:    #ffffff;
+    --primary: #003366;
+    --accent:  #0055b3;
+    --border:  #d0d7e3;
+    --text:    #1a1a2e;
+    --muted:   #6b7280;
+    --green:   #16a34a;
+    --amber:   #d97706;
+    --red:     #dc2626;
+    --radius:  8px;
+    --shadow:  0 1px 3px rgba(0,0,0,.10), 0 1px 2px rgba(0,0,0,.06);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+         background: var(--bg); color: var(--text); font-size: 14px; }
+
+  /* Header */
+  .header { background: var(--primary); color: #fff; padding: 12px 24px;
+            display: flex; align-items: center; justify-content: space-between;
+            box-shadow: 0 2px 6px rgba(0,0,0,.3); position: sticky; top: 0; z-index: 100; }
+  .header h1 { font-size: 18px; font-weight: 600; }
+  .header-sub { font-size: 11px; opacity: .7; margin-top: 2px; }
+  .header-right { display: flex; align-items: center; gap: 12px; }
+  .last-updated { font-size: 11px; opacity: .75; }
+  .btn { border: none; border-radius: 5px; padding: 6px 14px; font-size: 12px;
+         cursor: pointer; transition: opacity .15s; font-weight: 500; }
+  .btn:hover { opacity: .85; }
+  .btn:disabled { opacity: .5; cursor: default; }
+  .btn-primary  { background: #0055b3; color: #fff; }
+  .btn-ghost    { background: rgba(255,255,255,.15); border: 1px solid rgba(255,255,255,.3); color: #fff; }
+  .btn-sm       { padding: 4px 10px; font-size: 11px; }
+  .btn-danger   { background: var(--red); color: #fff; }
+
+  /* Layout */
+  .page { padding: 20px 24px; max-width: 1400px; margin: 0 auto; }
+
+  /* Filter bar */
+  .filter-bar { display: flex; align-items: center; gap: 16px; margin-bottom: 18px;
+                background: var(--card); border-radius: var(--radius); padding: 10px 16px;
+                box-shadow: var(--shadow); flex-wrap: wrap; }
+  .filter-bar label { font-size: 12px; color: var(--muted); font-weight: 500; }
+  .filter-bar select { border: 1px solid var(--border); border-radius: 5px; padding: 5px 10px;
+                       font-size: 13px; background: #fff; cursor: pointer; }
+  .filter-tag { font-size: 12px; color: var(--muted); }
+
+  /* KPI */
+  .section-title { font-size: 11px; font-weight: 600; color: var(--muted);
+                   text-transform: uppercase; letter-spacing: .6px; margin: 18px 0 8px; }
+  .kpi-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
+  .kpi-card { background: var(--card); border-radius: var(--radius); padding: 14px 16px;
+              box-shadow: var(--shadow); border-left: 4px solid var(--accent); }
+  .kpi-card.danger  { border-left-color: var(--red); }
+  .kpi-card.warning { border-left-color: var(--amber); }
+  .kpi-card.success { border-left-color: var(--green); }
+  .kpi-card.neutral { border-left-color: #94a3b8; }
+  .kpi-label { font-size: 11px; color: var(--muted); font-weight: 500; line-height: 1.3; margin-bottom: 6px; }
+  .kpi-value { font-size: 28px; font-weight: 700; line-height: 1; }
+  .kpi-sub   { font-size: 11px; color: var(--muted); margin-top: 4px; }
+  .kpi-email-btn { display: block; margin-top: 10px; width: 100%; font-size: 10px; padding: 4px 6px;
+                   background: none; border: 1px solid currentColor; border-radius: 4px; cursor: pointer;
+                   color: inherit; opacity: 0.65; line-height: 1.3; text-align: center; }
+  .kpi-email-btn:hover { opacity: 1; background: rgba(0,0,0,0.06); }
+
+  /* Charts */
+  .charts-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 20px; }
+  @media (max-width: 900px) { .charts-grid { grid-template-columns: 1fr; } }
+  .chart-card  { background: var(--card); border-radius: var(--radius); padding: 16px; box-shadow: var(--shadow); }
+  .chart-title { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase;
+                 letter-spacing: .5px; margin-bottom: 12px; }
+  .chart-wrap  { position: relative; height: 240px; }
+
+  /* Table */
+  .table-wrap { overflow-x: auto; border-radius: var(--radius); box-shadow: var(--shadow); }
+  table { width: 100%; border-collapse: collapse; background: var(--card); font-size: 12px; }
+  th { position: sticky; top: 0; background: #f4f6fb; color: var(--muted); font-weight: 600;
+       font-size: 10px; text-transform: uppercase; letter-spacing: .5px;
+       padding: 9px 10px; border-bottom: 2px solid var(--border); cursor: pointer;
+       white-space: nowrap; user-select: none; }
+  th:hover { background: #eaeef7; }
+  th.sorted-asc  span::after { content: " \25B2"; }
+  th.sorted-desc span::after { content: " \25BC"; }
+  td { padding: 8px 10px; border-bottom: 1px solid #f1f3f7; vertical-align: top; }
+  tr:hover td { background: #fafbff; }
+  tr.row-closed td { color: var(--muted); }
+  .truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+              max-width: 220px; display: block; }
+  .no-data { text-align: center; color: var(--muted); padding: 30px; font-style: italic; }
+  tr.group-header td { background:#eef1f8; font-weight:700; font-size:11px; color:#374151;
+                       padding:5px 10px; cursor:pointer; user-select:none; }
+  tr.group-header td:hover { background:#e2e8f4; }
+  tr.group-header .group-toggle { margin-right:6px; font-size:10px; }
+  .btn-delete { background:none; border:none; color:#9ca3af; cursor:pointer; padding:2px 5px;
+                font-size:15px; line-height:1; border-radius:4px; }
+  .btn-delete:hover { color:#ef4444; background:#fee2e2; }
+
+  /* Badges */
+  .badge { display: inline-block; padding: 2px 7px; border-radius: 99px; font-size: 10px; font-weight: 600; }
+  .b-corrective { background: #fee2e2; color: #b91c1c; }
+  .b-preventive { background: #dbeafe; color: #1d4ed8; }
+  .b-ofi        { background: #d1fae5; color: #065f46; }
+  .b-open       { background: #fef3c7; color: #92400e; }
+  .b-closed     { background: #f0fdf4; color: #166534; }
+  .b-overdue    { background: #fee2e2; color: #b91c1c; }
+  .b-pass       { background: #d1fae5; color: #065f46; }
+  .b-fail       { background: #fee2e2; color: #991b1b; }
+  .b-pending    { background: #f3f4f6; color: #6b7280; }
+  .b-unassigned { background: #fef9c3; color: #854d0e; }
+
+  /* States */
+  .state-box { text-align: center; padding: 80px 20px; color: var(--muted); }
+  .state-box .icon { font-size: 48px; margin-bottom: 14px; }
+  .state-box h2 { font-size: 18px; margin-bottom: 8px; color: var(--text); }
+  .state-box p  { font-size: 13px; max-width: 400px; margin: 0 auto 18px; line-height: 1.6; }
+  .spinner { width: 36px; height: 36px; border: 4px solid #e5e7eb; border-top-color: var(--accent);
+             border-radius: 50%; animation: spin .8s linear infinite; margin: 0 auto 14px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Auth overlay */
+  #auth-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,.55);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 200; backdrop-filter: blur(3px);
+  }
+  #auth-overlay.hidden { display: none; }
+  .auth-card {
+    background: #fff; border-radius: 12px; padding: 32px 36px;
+    max-width: 520px; width: 100%; box-shadow: 0 20px 60px rgba(0,0,0,.3);
+    text-align: center;
+  }
+  .auth-card h2 { font-size: 20px; color: var(--primary); margin-bottom: 6px; }
+  .auth-card .auth-sub { font-size: 13px; color: var(--muted); margin-bottom: 24px; }
+  .auth-step { display: none; }
+  .auth-step.active { display: block; }
+  .code-block {
+    font-size: 36px; font-weight: 800; letter-spacing: 8px; color: var(--primary);
+    background: #f0f4ff; border: 2px dashed var(--accent); border-radius: 8px;
+    padding: 16px 24px; margin: 16px 0; font-family: monospace; cursor: pointer;
+    transition: background .15s;
+  }
+  .code-block:hover { background: #e0e8ff; }
+  .code-hint { font-size: 11px; color: var(--muted); margin-bottom: 16px; }
+  .auth-url-btn {
+    display: inline-block; background: var(--primary); color: #fff;
+    padding: 10px 22px; border-radius: 6px; font-size: 14px; font-weight: 600;
+    text-decoration: none; margin-bottom: 20px; cursor: pointer; border: none;
+  }
+  .auth-url-btn:hover { opacity: .85; }
+  .auth-steps-list {
+    text-align: left; font-size: 13px; background: #f8fafc;
+    border-radius: 6px; padding: 14px 18px; margin: 16px 0;
+    border: 1px solid var(--border); line-height: 2.2;
+  }
+  .auth-steps-list ol { padding-left: 18px; }
+  .auth-divider { color: var(--muted); font-size: 12px; margin: 18px 0 14px; }
+  .auth-spinner-row { display: flex; align-items: center; justify-content: center; gap: 12px;
+                      color: var(--muted); font-size: 13px; margin: 16px 0; }
+  .auth-label-chip { font-size: 10px; background: #e8edf5; padding: 2px 8px; border-radius: 99px;
+                     color: var(--muted); margin-top: 8px; display: inline-block; }
+
+  /* Upload zone */
+  .upload-zone {
+    border: 2px dashed var(--border); border-radius: 8px; padding: 20px;
+    text-align: center; cursor: pointer; transition: all .15s;
+    color: var(--muted); font-size: 13px;
+  }
+  .upload-zone:hover, .upload-zone.drag-over {
+    border-color: var(--accent); background: #f0f4ff; color: var(--accent);
+  }
+  .upload-zone .upload-icon { font-size: 28px; margin-bottom: 8px; }
+  #file-input { display: none; }
+  .upload-note { font-size: 11px; color: var(--muted); margin-top: 8px; line-height: 1.6; }
+
+  /* Copy toast */
+  #copy-toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+    background: #1a1a2e; color: #fff; padding: 8px 18px; border-radius: 99px;
+    font-size: 12px; opacity: 0; transition: opacity .3s; pointer-events: none;
+    z-index: 999;
+  }
+  #copy-toast.show { opacity: 1; }
+
+  /* Source badge */
+  .source-badge { font-size: 10px; background: rgba(255,255,255,.15); padding: 2px 8px;
+                  border-radius: 99px; }
+
+  /* ── Document Compliance Matrix ─────────────────────────── */
+  tr.row-escalated td { background: #fff7ed; }
+  .dcm-date-esc-date    { color: var(--amber); font-weight: 600; font-size: 11px; }
+  .dcm-date-pub-date    { color: var(--green); font-size: 11px; }
+  .dcm-date-review-date { color: var(--accent); font-size: 11px; font-style: italic; }
+
+  .dcm-edit-toggle {
+    background: none; border: 1px solid var(--border); border-radius: 4px;
+    cursor: pointer; padding: 2px 6px; font-size: 12px; color: var(--muted);
+    transition: all .15s; line-height: 1.4;
+  }
+  .dcm-edit-toggle:hover, .dcm-edit-toggle.active {
+    background: var(--accent); color: #fff; border-color: var(--accent);
+  }
+
+  .dcm-edit-row > td {
+    padding: 0 !important; background: #f0f5ff;
+    border-bottom: 2px solid var(--accent);
+  }
+  .dcm-edit-form    { padding: 12px 16px 10px; }
+  .dcm-edit-fields  { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 10px; }
+  .dcm-edit-field   { display: flex; flex-direction: column; gap: 3px; min-width: 130px; }
+  .dcm-edit-field > label {
+    font-size: 10px; font-weight: 600; color: var(--muted);
+    text-transform: uppercase; letter-spacing: .4px;
+  }
+  .dcm-edit-field input, .dcm-edit-field select {
+    border: 1px solid var(--border); border-radius: 4px;
+    padding: 4px 8px; font-size: 12px; background: #fff;
+  }
+  .dcm-check-label {
+    display: flex; align-items: center; gap: 6px; font-size: 12px;
+    color: var(--text); cursor: pointer; font-weight: 400;
+    text-transform: none; letter-spacing: 0;
+  }
+  .dcm-edit-notes-row { margin-bottom: 8px; }
+  .dcm-edit-notes-row > label {
+    display: block; font-size: 10px; font-weight: 600; color: var(--muted);
+    text-transform: uppercase; letter-spacing: .4px; margin-bottom: 4px;
+  }
+  .dcm-edit-notes-row textarea {
+    width: 100%; border: 1px solid var(--border); border-radius: 4px;
+    padding: 6px 8px; font-size: 12px; font-family: inherit; resize: vertical;
+  }
+  .dcm-edit-actions { display: flex; align-items: center; gap: 10px; margin-top: 6px; }
+  .dcm-saved-msg    { font-size: 11px; color: var(--green); font-weight: 600; }
+
+  tr.dcm-row-edited > td:nth-child(2)::before {
+    content: '●'; color: var(--accent); font-size: 7px;
+    vertical-align: super; margin-right: 2px;
+  }
+
+  .dcm-note-cell {
+    max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    display: block; color: var(--muted); font-style: italic; font-size: 12px;
+    cursor: default;
+  }
+
+  .approver-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+    gap: 12px; margin-top: 8px;
+  }
+  .approver-card {
+    background: var(--card); border-radius: var(--radius); padding: 14px;
+    box-shadow: var(--shadow); border-left: 4px solid var(--accent);
+  }
+  .approver-card.all-done { border-left-color: var(--green); }
+  .approver-card-header   { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
+  .approver-name          { font-weight: 600; font-size: 13px; }
+  .approver-total         { font-size: 11px; color: var(--muted); }
+  .approver-stats         { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 10px; }
+  .approver-all-done      { font-size: 11px; color: var(--green); font-weight: 600; }
+
+  .approver-card details                 { margin-top: 8px; }
+  .approver-card details > summary       { list-style: none; cursor: pointer; font-size: 11px;
+                                           color: var(--accent); font-weight: 500; padding: 4px 0;
+                                           user-select: none; }
+  .approver-card details > summary::-webkit-details-marker { display: none; }
+  .approver-card details > summary::before       { content: '▸ '; }
+  .approver-card details[open] > summary::before { content: '▾ '; }
+  .approver-doc-list      { margin-top: 8px; }
+  .approver-doc-group     { margin-bottom: 10px; }
+  .approver-doc-group-lbl { font-size: 10px; font-weight: 700; color: var(--muted);
+                             text-transform: uppercase; letter-spacing: .5px;
+                             padding: 2px 0 5px; border-bottom: 1px solid #eef0f5; margin-bottom: 5px; }
+  .approver-doc-row       { display: grid;
+                             grid-template-columns: 1fr auto;
+                             grid-template-rows: auto auto;
+                             gap: 3px 8px;
+                             padding: 6px 0;
+                             border-bottom: 1px solid #f5f6fa;
+                             font-size: 12px; }
+  .approver-doc-row:last-child { border-bottom: none; }
+  .approver-doc-name      { font-weight: 500; line-height: 1.3; grid-column: 1; }
+  .approver-esc-check     { display: flex; align-items: center; gap: 4px; font-size: 11px;
+                             white-space: nowrap; grid-column: 2; grid-row: 1; align-self: center; }
+  .approver-esc-check input { cursor: pointer; }
+  .approver-doc-owner     { font-size: 11px; color: var(--muted); grid-column: 1; grid-row: 2; }
+  .approver-doc-note-wrap { grid-column: 1 / -1; }
+  .approver-doc-note-wrap input { width: 100%; border: 1px solid var(--border); border-radius: 4px;
+                                  padding: 3px 7px; font-size: 11px; color: var(--text);
+                                  background: #fafbff; margin-top: 2px; }
+  .approver-doc-note-wrap input:focus { outline: none; border-color: var(--accent); background: #fff; }
+</style>
+
+<!--[if gte mso 9]><xml>
+<mso:CustomDocumentProperties>
+<mso:_ApprovalStatus msdt:dt="string">0</mso:_ApprovalStatus>
+<mso:_ApprovalAssignedTo msdt:dt="string"></mso:_ApprovalAssignedTo>
+<mso:_ApprovalRespondedBy msdt:dt="string"></mso:_ApprovalRespondedBy>
+<mso:DocumentTitle msdt:dt="string">Document Compliance Matrix</mso:DocumentTitle>
+<mso:_ApprovalSentBy msdt:dt="string"></mso:_ApprovalSentBy>
+</mso:CustomDocumentProperties>
+</xml><![endif]-->
+</head>
+<body>
+
+<!-- ======= AUTH OVERLAY ======= -->
+<div id="auth-overlay">
+  <div class="auth-card">
+    <h2>&#128196; Document Compliance Matrix</h2>
+    <div class="auth-sub">Connecting to SharePoint&hellip;</div>
+
+    <!-- starting / connecting -->
+    <div id="auth-step-starting" class="auth-step active">
+      <div class="auth-spinner-row">
+        <div class="spinner" style="margin:0;width:24px;height:24px;border-width:3px"></div>
+        <span id="auth-connecting-msg">Initializing&hellip;</span>
+      </div>
+    </div>
+
+    <!-- msal sign-in -->
+    <div id="auth-step-device" class="auth-step">
+      <div class="auth-steps-list">
+        <p style="margin-bottom:18px;color:var(--muted);font-size:14px">
+          Sign in with your ASI Robots Microsoft account to load your Document Compliance Matrix.
+        </p>
+      </div>
+      <button id="msal-signin-btn" onclick="_msalSignIn()"
+        style="display:inline-flex;align-items:center;gap:10px;background:#0078d4;color:#fff;
+               border:none;border-radius:6px;padding:11px 24px;font-size:15px;font-weight:600;
+               cursor:pointer;box-shadow:0 2px 6px rgba(0,120,212,.35)">
+        <svg width="20" height="20" viewBox="0 0 21 21" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="1" y="1" width="9" height="9" fill="#f25022"/>
+          <rect x="11" y="1" width="9" height="9" fill="#7fba00"/>
+          <rect x="1" y="11" width="9" height="9" fill="#00a4ef"/>
+          <rect x="11" y="11" width="9" height="9" fill="#ffb900"/>
+        </svg>
+        Sign in with Microsoft
+      </button>
+      <div class="auth-label-chip" id="auth-app-label" style="margin-top:16px"></div>
+    </div>
+
+    <!-- fetching data -->
+    <div id="auth-step-fetching" class="auth-step">
+      <div class="auth-spinner-row">
+        <div class="spinner" style="margin:0;width:24px;height:24px;border-width:3px"></div>
+        <span>Loading data from SharePoint&hellip;</span>
+      </div>
+      <div class="auth-label-chip" id="auth-fetch-label"></div>
+    </div>
+
+    <!-- error -->
+    <div id="auth-step-error" class="auth-step">
+      <div class="state-box" style="padding:16px 0">
+        <div class="icon" style="font-size:36px">&#9888;&#65039;</div>
+        <h2 style="color:var(--red);font-size:15px">Sign-in failed</h2>
+        <p id="auth-error-msg" style="margin-bottom:12px"></p>
+        <button class="btn btn-primary btn-sm" onclick="retryAuth()" style="margin-bottom:16px">&#8635; Retry sign-in</button>
+      </div>
+    </div>
+
+    <!-- file upload fallback -->
+    <div class="auth-divider">&mdash;&nbsp; or upload a SharePoint list export &nbsp;&mdash;</div>
+    <div class="upload-zone" id="drop-zone"
+         onclick="document.getElementById('file-input').click()"
+         ondragover="onDcmDragOver(event)" ondragleave="onDcmDragLeave()" ondrop="onDcmDrop(event)">
+      <div class="upload-icon">&#128196;</div>
+      <div>Drop <strong>Document Compliance Matrix.xlsx</strong> here, or click to browse</div>
+      <div class="upload-note">
+        Export from SharePoint: <strong>Export &rarr; Export to Excel</strong><br>
+        or export the Document Compliance Matrix.xlsx directly.
+      </div>
+    </div>
+    <input type="file" id="file-input" accept=".xlsx,.xls" onchange="handleDcmFileInput(event)">
+  </div>
+</div>
+
+<!-- ======= HEADER ======= -->
+<div class="header">
+  <div>
+    <h1>&#128196; Document Compliance Matrix</h1>
+    <div class="header-sub" id="header-sub">Product PPS &mdash; SharePoint</div>
+  </div>
+  <div class="header-right">
+    <span class="last-updated" id="last-updated"></span>
+    <span class="source-badge" id="source-chip" style="display:none"></span>
+    <button class="btn btn-ghost" id="btn-refresh" onclick="triggerRefresh()" disabled>&#8635; Refresh</button>
+    <button class="btn btn-ghost btn-sm" id="btn-change-source" onclick="showAuthOverlay()" style="display:none">Change source</button>
+  </div>
+</div>
+
+<!-- ======= MAIN CONTENT ======= -->
+<div class="page" id="main-page" style="display:none">
+
+  <div class="filter-bar">
+    <label>Show:&nbsp;
+      <select id="dcm-filter" onchange="renderDcmFiltered()">
+        <option value="all">All Documents</option>
+        <option value="published">Published</option>
+        <option value="review">Needs Review</option>
+        <option value="progress">In Progress</option>
+        <option value="escalated">Escalated</option>
+        <option value="archived">Archived</option>
+      </select>
+    </label>
+    <span class="filter-tag" id="dcm-filter-count"></span>
+    <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
+      <button class="btn btn-sm" id="btn-add-doc"
+              style="background:#16a34a;color:#fff;display:none"
+              onclick="showAddDocModal()">
+        &#43; Add Document
+      </button>
+      <button class="btn btn-sm"
+              style="background:#7c3aed;color:#fff"
+              onclick="copyEscalationEmail(this)">
+        &#128680; Copy C-Suite escalation email
+      </button>
+    </div>
+  </div>
+
+  <div class="section-title">Document Status &mdash; Executive Summary</div>
+  <div class="kpi-grid" id="dcm-kpi-grid"></div>
+
+  <div class="section-title" style="margin-top:20px">By Document Approver</div>
+  <div id="dcm-approver-grid" class="approver-grid"></div>
+
+  <div class="charts-grid" style="margin-top:20px">
+    <div class="chart-card">
+      <div class="chart-title">By Status</div>
+      <div class="chart-wrap"><canvas id="dcm-chart-status"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">By Process Owner</div>
+      <div class="chart-wrap"><canvas id="dcm-chart-owner"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">By Document Approver</div>
+      <div class="chart-wrap"><canvas id="dcm-chart-approver"></canvas></div>
+    </div>
+  </div>
+
+  <div style="margin-top:24px;display:flex;align-items:center;gap:16px">
+    <div class="section-title" style="margin:0">Document Detail</div>
+    <label style="margin-left:auto;font-size:12px;color:var(--muted);display:flex;align-items:center;gap:4px">Group:&nbsp;
+      <select id="dcm-group" onchange="dcmSetGroup(this.value)">
+        <option value="">None</option>
+        <option value="Status">Status</option>
+        <option value="Escalated">Escalated</option>
+        <option value="Process Owner">Process Owner</option>
+        <option value="Approver">Approver</option>
+        <option value="Published Date">Published Date</option>
+        <option value="Next Review">Next Review</option>
+      </select>
+    </label>
+  </div>
+  <div class="table-wrap">
+    <table id="dcm-table">
+      <thead id="dcm-table-head"></thead>
+      <tbody id="dcm-table-body"></tbody>
+    </table>
+  </div>
+
+</div>
+
+<!-- Copy toast -->
+<div id="copy-toast">Copied!</div>
+
+<script>
+// ====================================================================
+// Shared utilities
+// ====================================================================
+let charts = {};
+
+const PALETTE = ['#2563eb','#ef4444','#10b981','#f59e0b','#8b5cf6','#ec4899',
+                 '#06b6d4','#84cc16','#f97316','#6366f1','#14b8a6','#a855f7'];
+
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function makeHBar(id, data) {
+  const ctx     = document.getElementById(id).getContext('2d');
+  const entries = Object.entries(data).sort((a,b)=>b[1]-a[1]).slice(0,15);
+  const labels  = entries.map(([k])=>k.length>42?k.slice(0,40)+'\u2026':k);
+  const vals    = entries.map(([,v])=>v);
+  if (charts[id]) charts[id].destroy();
+  charts[id] = new Chart(ctx, {
+    type: 'bar',
+    data: { labels, datasets: [{ data: vals, backgroundColor: vals.map((_,i)=>PALETTE[i%PALETTE.length]), borderWidth: 0, borderRadius: 3 }] },
+    options: {
+      indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { title: c=>entries[c[0].dataIndex][0] }}},
+      scales: {
+        x: { beginAtZero: true, ticks: { precision: 0, font: { size: 10 }}, grid: { color: '#f0f0f0' }},
+        y: { ticks: { font: { size: 10 }}, grid: { display: false }}
+      }
+    }
+  });
+}
+
+// ====================================================================
+// Auth state
+// ====================================================================
+let pollTimer      = null;
+let fetchFailCount = 0;
+let lastAuthStatus = '';
+let dataSource     = '';  // 'live' | 'file'
+let fetchedAt      = '';
+
+function startPolling() {
+  stopPolling();
+  pollAuthStatus();
+  pollTimer = setInterval(pollAuthStatus, 3000);
+}
+function stopPolling() {
+  if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+}
+
+async function pollAuthStatus() {
+  try {
+    const resp = await fetch('/api/auth-status');
+    if (!resp.ok) { fetchFailCount++; if (fetchFailCount >= 4) showServerDown(); return; }
+    fetchFailCount = 0;
+    const state = await resp.json();
+    updateAuthUI(state);
+    if (state.status === 'ready' || state.status === 'error' || state.status === 'declined') {
+      stopPolling();
+    }
+  } catch (e) {
+    fetchFailCount++;
+    if (fetchFailCount >= 4) showServerDown();
+  }
+}
+
+function showServerDown() {
+  stopPolling();
+  document.getElementById('auth-error-msg').textContent =
+    'Cannot reach the local server. Please close and re-launch using launch.bat.';
+  setAuthStep('error');
+}
+
+function setAuthStep(name) {
+  document.querySelectorAll('.auth-step').forEach(el => el.classList.remove('active'));
+  const el = document.getElementById('auth-step-' + name);
+  if (el) el.classList.add('active');
+}
+
+function updateAuthUI(state) {
+  if (!state || !state.status) return;
+  const s = state.status;
+  if (s === lastAuthStatus && s !== 'device_code') return;
+  lastAuthStatus = s;
+
+  switch (s) {
+    case 'starting':
+    case 'connecting':
+      document.getElementById('auth-connecting-msg').textContent =
+        state.label ? `Trying ${state.label}\u2026` : 'Connecting to Microsoft\u2026';
+      setAuthStep('starting');
+      break;
+
+    case 'device_code': {
+      const code = state.user_code || '';
+      const url  = state.verification_uri || 'https://microsoft.com/devicelogin';
+      document.getElementById('auth-user-code').textContent = code;
+      document.getElementById('auth-url-btn').href = url;
+      document.getElementById('auth-url-btn').textContent = 'Open ' + url.replace('https://', '');
+      document.getElementById('auth-app-label').textContent = state.label || '';
+      setAuthStep('device');
+      break;
+    }
+
+    case 'fetching':
+      document.getElementById('auth-fetch-label').textContent = state.label || '';
+      setAuthStep('fetching');
+      break;
+
+    case 'ready':
+      loadLiveData(state.label || 'SharePoint');
+      break;
+
+    case 'declined':
+      document.getElementById('auth-error-msg').textContent =
+        'Sign-in was cancelled. Try again or use file upload.';
+      setAuthStep('error');
+      break;
+
+    case 'error':
+      document.getElementById('auth-error-msg').textContent =
+        state.message || 'Authentication failed.';
+      setAuthStep('error');
+      break;
+  }
+}
+
+async function loadLiveData(label) {
+  try {
+    const resp = await fetch('/api/data');
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const json = await resp.json();
+    if (json.mode === 'pending') { startPolling(); return; }
+    if (!json.items || !json.items.length) throw new Error('No items returned from SharePoint.');
+
+    dcmItems = json.items.filter(r => dcmVal(r, 'Document #') || dcmVal(r, 'Document Name/Link'));
+    fetchedAt  = json.fetchedAt || new Date().toISOString();
+    dataSource = 'live';
+
+    // Fetch SP group members for people pickers (non-blocking)
+    fetch('/api/sp-people').then(r => r.json()).then(data => {
+      spPeopleList = Array.isArray(data) ? data : [];
+    }).catch(() => { spPeopleList = []; });
+
+    // Apply first-load defaults
+    applyDcmDefaults(false);
+
+    document.getElementById('auth-overlay').classList.add('hidden');
+    document.getElementById('main-page').style.display = '';
+    document.getElementById('btn-refresh').disabled = false;
+    document.getElementById('btn-add-doc').style.display = '';
+    document.getElementById('btn-change-source').style.display = '';
+    if (label) {
+      document.getElementById('source-chip').textContent = label;
+      document.getElementById('source-chip').style.display = '';
+    }
+    if (fetchedAt) {
+      document.getElementById('last-updated').textContent =
+        'Updated: ' + new Date(fetchedAt).toLocaleString();
+    }
+    renderDcm();
+  } catch (e) {
+    document.getElementById('auth-error-msg').textContent = 'Data load error: ' + e.message;
+    setAuthStep('error');
+  }
+}
+
+function showAuthOverlay() {
+  lastAuthStatus  = '';
+  fetchFailCount  = 0;
+  document.getElementById('auth-overlay').classList.remove('hidden');
+  setAuthStep('starting');
+  document.getElementById('auth-connecting-msg').textContent = 'Connecting to Microsoft\u2026';
+  fetch('/api/refresh').catch(() => {});
+  startPolling();
+}
+
+async function triggerRefresh() {
+  const btn = document.getElementById('btn-refresh');
+  btn.disabled  = true;
+  btn.textContent = '\u27F3 Refreshing\u2026';
+  try {
+    // Ask server to re-fetch (re-auth if needed)
+    await fetch('/api/refresh').catch(() => {});
+    // Poll until ready, then reload data
+    await new Promise((resolve) => {
+      const t = setInterval(async () => {
+        try {
+          const r = await fetch('/api/auth-status');
+          if (!r.ok) return;
+          const s = await r.json();
+          if (s.status === 'ready') {
+            clearInterval(t);
+            await loadLiveData(s.label || 'SharePoint');
+            resolve();
+          } else if (s.status === 'error' || s.status === 'declined') {
+            clearInterval(t);
+            resolve();
+          } else if (s.status === 'device_code') {
+            // Need to re-auth — show overlay
+            clearInterval(t);
+            showAuthOverlay();
+            resolve();
+          }
+        } catch(e) { clearInterval(t); resolve(); }
+      }, 2000);
+      setTimeout(() => { clearInterval(t); resolve(); }, 120000);
+    });
+  } finally {
+    btn.disabled  = false;
+    btn.textContent = '\u27F3 Refresh';
+  }
+}
+
+function retryAuth() {
+  lastAuthStatus = '';
+  fetchFailCount = 0;
+  fetch('/api/refresh').catch(() => {});
+  setAuthStep('starting');
+  document.getElementById('auth-connecting-msg').textContent = 'Connecting to Microsoft\u2026';
+  startPolling();
+}
+
+async function skipAuthMethod(btn) {
+  btn.disabled = true;
+  btn.textContent = '&#9197; Skipping\u2026';
+  try {
+    await fetch('/api/skip-auth', { method: 'POST' });
+    btn.textContent = '\u2713 Skipped \u2014 trying next method\u2026';
+  } catch (e) {
+    btn.textContent = '&#9197; Got an error? Try next sign-in method';
+    btn.disabled = false;
+  }
+}
+
+function copyCode() {
+  const code = document.getElementById('auth-user-code').textContent;
+  if (!code) return;
+  navigator.clipboard.writeText(code).then(() => {
+    const toast = document.getElementById('copy-toast');
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 2000);
+  }).catch(() => {
+    const ta = document.createElement('textarea');
+    ta.value = code; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select(); document.execCommand('copy');
+    document.body.removeChild(ta);
+  });
+}
+
+// ====================================================================
+// Document Compliance Matrix
+// ====================================================================
+let dcmItems   = [];
+let dcmSortCol = null;
+let dcmSortDir = 'asc';
+let dcmGroupCol       = null;   // label string or null
+let dcmGroupCollapsed = new Set();
+let dcmOverrides        = {};
+let dcmEditOpen         = new Set();
+let dcmApproverExpanded = new Set();
+let spPeopleList        = [];   // members of the Product PPS SharePoint group
+
+function dcmApproverToggle(name, open) {
+  if (open) dcmApproverExpanded.add(name);
+  else      dcmApproverExpanded.delete(name);
+}
+
+function loadDcmOverrides() {
+  try { dcmOverrides = JSON.parse(localStorage.getItem('dcm_overrides') || '{}'); }
+  catch(e) { dcmOverrides = {}; }
+}
+function saveDcmOverrides() {
+  localStorage.setItem('dcm_overrides', JSON.stringify(dcmOverrides));
+}
+
+const DCM_BADGE = {
+  'Published':     'b-closed',
+  'Peer Review':   'b-overdue',
+  'In Progress':   'b-open',
+  'Final Approval':'b-preventive',
+  'Archived':      'b-pending',
+};
+const DCM_COLOR = {
+  'Published':     '#16a34a',
+  'Peer Review':   '#d97706',
+  'In Progress':   '#2563eb',
+  'Final Approval':'#7c3aed',
+  'Archived':      '#94a3b8',
+};
+
+function dcmVal(row, ...keys) {
+  for (const k of keys) {
+    const v = row[k];
+    if (v !== undefined && v !== null && String(v).trim() !== '') return String(v).trim();
+  }
+  return '';
+}
+
+function dcmEffective(row, key) {
+  const k  = dcmVal(row, 'Document #');
+  const ov = k && dcmOverrides[k];
+  if (ov && ov[key] !== undefined && ov[key] !== '') return ov[key];
+  return dcmVal(row, key);
+}
+
+function dcmKey(row) { return dcmVal(row, 'Document #'); }
+
+function toDateInput(v) {
+  if (!v) return '';
+  const s = String(v).trim();
+  const isoMatch = s.match(/^(\d{4}-\d{2}-\d{2})/);
+  if (isoMatch) return isoMatch[1];
+  const mdyMatch = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (mdyMatch) return `${mdyMatch[3]}-${mdyMatch[1].padStart(2,'0')}-${mdyMatch[2].padStart(2,'0')}`;
+  const dmyMatch = s.match(/^(\d{1,2})-(\d{1,2})-(\d{4})/);
+  if (dmyMatch) return `${dmyMatch[3]}-${dmyMatch[2].padStart(2,'0')}-${dmyMatch[1].padStart(2,'0')}`;
+  try { const d = new Date(s); if (!isNaN(d)) return d.toISOString().slice(0,10); } catch(e) {}
+  return '';
+}
+
+function nextFriday() {
+  const d = new Date();
+  const day = d.getDay();
+  const add = day === 5 ? 7 : (5 - day + 7) % 7 || 7;
+  d.setDate(d.getDate() + add);
+  return d.toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric', year:'numeric' });
+}
+
+function dcmStatus(row)    { return dcmEffective(row, 'Status'); }
+function dcmIsPublished(r) { return dcmStatus(r).toLowerCase() === 'published'; }
+function dcmIsArchived(r)  { return dcmStatus(r).toLowerCase() === 'archived'; }
+function dcmNeedsReview(r) {
+  const s = dcmStatus(r).toLowerCase();
+  return s === 'peer review' || s === 'final approval';
+}
+function dcmInProgress(r) { return dcmStatus(r).toLowerCase() === 'in progress'; }
+function dcmIsEscalated(r) {
+  const v = dcmEffective(r, 'Escalated').toLowerCase();
+  return !!v && !['no', 'false', '0', 'n', 'n/a', '—', '-', ''].includes(v);
+}
+
+function dcmActiveRows() {
+  return dcmItems.filter(r => dcmVal(r, 'Document #') || dcmVal(r, 'Document Name/Link'));
+}
+
+// All people: SP group members + anyone already named in the data
+function dcmPeopleList() {
+  const s = new Set(spPeopleList.map(p => p.name).filter(Boolean));
+  ['Process Owner', 'Document Approver', 'Prepared By'].forEach(field => {
+    dcmItems.forEach(r => { const v = dcmEffective(r, field); if (v) s.add(v); });
+  });
+  return [...s].sort();
+}
+function dcmOwnerList() {
+  const s = new Set(dcmPeopleList());
+  dcmItems.forEach(r => { const v = dcmEffective(r, 'Process Owner'); if (v) s.add(v); });
+  return [...s].sort();
+}
+function dcmApproverList() {
+  const s = new Set(dcmPeopleList());
+  dcmItems.forEach(r => { const v = dcmEffective(r, 'Document Approver'); if (v) s.add(v); });
+  return [...s].sort();
+}
+
+function computeDcmKPIs(rows) {
+  const nonArchived = rows.filter(r => !dcmIsArchived(r));
+  const total       = nonArchived.length;
+  const published   = nonArchived.filter(dcmIsPublished).length;
+  const review      = nonArchived.filter(dcmNeedsReview).length;
+  const progress    = nonArchived.filter(dcmInProgress).length;
+  const escalated   = rows.filter(dcmIsEscalated).length;
+  const archived    = rows.filter(dcmIsArchived).length;
+  const noOwner     = nonArchived.filter(r => !dcmEffective(r, 'Process Owner')).length;
+  const noApprover  = nonArchived.filter(r => !dcmEffective(r, 'Document Approver')).length;
+  return { total, published, review, progress, escalated, archived, noOwner, noApprover };
+}
+
+function renderDcm() {
+  loadDcmOverrides();
+  const rows = dcmActiveRows();
+  const k    = computeDcmKPIs(rows);
+
+  document.getElementById('dcm-kpi-grid').innerHTML = [
+    { label: 'Total Documents',       value: k.total,       sub: 'Excl. archived',     style: '' },
+    { label: 'Published',             value: k.published,   sub: '',                   style: 'success' },
+    { label: 'Needs Review',          value: k.review,      sub: 'Peer Review + Final',style: k.review     ? 'warning' : '' },
+    { label: 'In Progress',           value: k.progress,    sub: '',                   style: k.progress   ? 'neutral'  : '' },
+    { label: 'Escalated',             value: k.escalated,   sub: '',                   style: k.escalated  ? 'danger'  : 'neutral', emailFn: k.escalated  ? 'copyEscalationEmail'  : null },
+    { label: 'Archived',              value: k.archived,    sub: '',                   style: 'neutral' },
+    { label: 'No Process Owner',      value: k.noOwner,     sub: 'Unassigned',         style: k.noOwner    ? 'danger'  : 'success',  emailFn: k.noOwner    ? 'copyNoOwnerEmail'    : null },
+    { label: 'No Document Approver',  value: k.noApprover,  sub: 'Unassigned',         style: k.noApprover ? 'danger'  : 'success',  emailFn: k.noApprover ? 'copyNoApproverEmail' : null },
+  ].map(c => `<div class="kpi-card ${c.style}">
+    <div class="kpi-label">${c.label}</div>
+    <div class="kpi-value" style="font-size:${String(c.value).length > 4 ? '20px' : '28px'}">${c.value}</div>
+    ${c.sub ? `<div class="kpi-sub">${c.sub}</div>` : ''}
+    ${c.emailFn ? `<button class="kpi-email-btn" onclick="${c.emailFn}(this)">&#128203; Copy escalation email</button>` : ''}
+  </div>`).join('');
+
+  renderApproverSection(rows);
+  renderDcmCharts(rows);
+  renderDcmTableHeader();
+  renderDcmTable(rows);
+  document.getElementById('dcm-filter-count').textContent = `${rows.length} documents`;
+}
+
+function renderDcmFiltered() {
+  const f    = document.getElementById('dcm-filter').value;
+  const base = dcmActiveRows();
+  let rows;
+  switch (f) {
+    case 'published': rows = base.filter(dcmIsPublished); break;
+    case 'review':    rows = base.filter(dcmNeedsReview); break;
+    case 'progress':  rows = base.filter(dcmInProgress);  break;
+    case 'escalated': rows = dcmItems.filter(dcmIsEscalated); break;
+    case 'archived':  rows = dcmItems.filter(dcmIsArchived);  break;
+    default:          rows = base;
+  }
+  document.getElementById('dcm-filter-count').textContent = `${rows.length} documents`;
+  const k = computeDcmKPIs(dcmActiveRows());
+  document.getElementById('dcm-kpi-grid').querySelectorAll('.kpi-value').forEach((el, i) => {
+    const vals = [k.total, k.published, k.review, k.progress, k.escalated, k.archived, k.noOwner, k.noApprover];
+    if (i < vals.length) el.textContent = vals[i];
+  });
+  renderApproverSection(dcmActiveRows());
+  renderDcmCharts(rows);
+  renderDcmTable(rows);
+}
+
+const APPROVER_STATUS_ORDER = ['In Progress', 'Peer Review', 'Final Approval', 'Published', 'Archived', ''];
+
+function renderApproverSection(rows) {
+  const groups = {};
+  rows.forEach(r => {
+    const a = dcmEffective(r, 'Document Approver') || '(Unassigned)';
+    if (!groups[a]) groups[a] = [];
+    groups[a].push(r);
+  });
+
+  const html = Object.entries(groups)
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([name, docs]) => {
+      const active   = docs.filter(r => !dcmIsArchived(r));
+      const pub      = active.filter(dcmIsPublished).length;
+      const rev      = active.filter(dcmNeedsReview).length;
+      const prog     = active.filter(dcmInProgress).length;
+      const escCnt   = docs.filter(dcmIsEscalated).length;
+      const pending  = active.filter(r => !dcmIsPublished(r)).length;
+      const allDone  = pending === 0;
+      const safeName = name.replace(/'/g, "\\'");
+      const isOpen   = dcmApproverExpanded.has(name);
+
+      const badges = [
+        pub    ? `<span class="badge b-closed">${pub} Published</span>`          : '',
+        rev    ? `<span class="badge b-overdue">${rev} Needs Review</span>`      : '',
+        prog   ? `<span class="badge b-open">${prog} In Progress</span>`         : '',
+        escCnt ? `<span class="badge b-overdue">&#9888; ${escCnt} Escalated</span>` : '',
+      ].filter(Boolean).join('');
+
+      const byStatus = {};
+      docs.forEach(r => {
+        const s = dcmStatus(r) || '';
+        if (!byStatus[s]) byStatus[s] = [];
+        byStatus[s].push(r);
+      });
+
+      const orderedKeys = [
+        ...APPROVER_STATUS_ORDER,
+        ...Object.keys(byStatus).filter(s => !APPROVER_STATUS_ORDER.includes(s))
+      ].filter((s, i, arr) => arr.indexOf(s) === i && byStatus[s]?.length);
+
+      const docGroupHtml = orderedKeys.map(statusKey => {
+        const groupDocs = byStatus[statusKey];
+        const label = statusKey || '(No Status)';
+        const docRows = groupDocs.map(r => {
+          const k      = dcmKey(r);
+          const safeK  = k.replace(/'/g, "\\'");
+          const num    = dcmVal(r, 'Document #');
+          const dname  = dcmVal(r, 'Document Name/Link');
+          const owner  = dcmEffective(r, 'Process Owner');
+          const isEsc  = dcmIsEscalated(r);
+          const notes  = dcmEffective(r, 'Notes');
+          return `<div class="approver-doc-row">
+            <span class="approver-doc-name">${esc(num ? num + ' \u2014 ' : '')}${esc(dname)}</span>
+            <label class="approver-esc-check">
+              <input type="checkbox" ${isEsc ? 'checked' : ''}
+                     onchange="dcmAutoSave('${safeK}','Escalated',this.checked?'Yes':'No')">
+              Escalated
+            </label>
+            <span class="approver-doc-owner">&#128100; ${owner ? esc(owner) : '<em style="color:var(--red)">No owner</em>'}</span>
+            <div class="approver-doc-note-wrap">
+              <input type="text" placeholder="Add note\u2026" value="${esc(notes)}"
+                     onblur="dcmAutoSave('${safeK}','Notes',this.value)">
+            </div>
+          </div>`;
+        }).join('');
+        return `<div class="approver-doc-group">
+          <div class="approver-doc-group-lbl">${esc(label)}</div>
+          ${docRows}
+        </div>`;
+      }).join('');
+
+      const pendingCnt = docs.filter(r => {
+        const k = dcmKey(r);
+        return k && r._spId && dcmOverrides[k] && Object.keys(dcmOverrides[k]).length > 0;
+      }).length;
+
+      const action = allDone
+        ? `<span class="approver-all-done">&#10003; All published</span>`
+        : `<button class="btn btn-sm" style="margin-top:2px"
+               onclick="copyApproverEmail('${safeName}',this)">&#128203; Copy review email</button>`;
+
+      return `<div class="approver-card${allDone ? ' all-done' : ''}">
+        <div class="approver-card-header">
+          <span class="approver-name">${esc(name)}</span>
+          <span class="approver-total">${active.length} doc${active.length !== 1 ? 's' : ''}</span>
+        </div>
+        <div class="approver-stats">${badges || '<span style="color:var(--muted);font-size:11px">No active docs</span>'}</div>
+        ${action}
+        <details${isOpen ? ' open' : ''} ontoggle="dcmApproverToggle('${safeName}',this.open)">
+          <summary>${docs.length} document${docs.length !== 1 ? 's' : ''}</summary>
+          <div class="approver-doc-list">${docGroupHtml}</div>
+          <button class="btn btn-sm" style="background:#0284c7;color:#fff;width:100%;margin-top:8px"
+              onclick="saveApproverDcmRows('${safeName}',this)">
+            &#8679; Save All${pendingCnt > 0 ? ` (${pendingCnt})` : ''}
+          </button>
+        </details>
+      </div>`;
+    }).join('');
+
+  document.getElementById('dcm-approver-grid').innerHTML =
+    html || '<span style="color:var(--muted);font-size:12px">No approver data</span>';
+}
+
+function copyApproverEmail(approverName, btn) {
+  const pending = dcmActiveRows().filter(r =>
+    !dcmIsPublished(r) &&
+    !dcmIsArchived(r) &&
+    (dcmEffective(r, 'Document Approver') || '(Unassigned)') === approverName
+  );
+
+  if (!pending.length) {
+    btn.textContent = 'Nothing pending!';
+    setTimeout(() => { btn.textContent = '📋 Copy review email'; }, 2500);
+    return;
+  }
+
+  const byOwner = {};
+  pending.forEach(r => {
+    const owner = dcmEffective(r, 'Process Owner') || '(No Process Owner Assigned)';
+    if (!byOwner[owner]) byOwner[owner] = [];
+    byOwner[owner].push(r);
+  });
+
+  let hasMissingOwnership = false;
+  let ownerSections = '';
+
+  Object.entries(byOwner).sort((a,b) => a[0].localeCompare(b[0])).forEach(([owner, docs]) => {
+    const noOwner = owner === '(No Process Owner Assigned)';
+    if (noOwner) hasMissingOwnership = true;
+
+    const docLines = docs.map(r => {
+      const num    = dcmVal(r, 'Document #');
+      const name   = dcmVal(r, 'Document Name/Link');
+      const status = dcmStatus(r) || 'Unknown';
+      const author = dcmEffective(r, 'Author', 'Document Author', 'Created By');
+      const nxtRev = toDateInput(dcmEffective(r, 'Next Review Date'));
+      const dl     = deadlineFrom(nxtRev);
+      const flagEsc = dcmIsEscalated(r) ? '  ⚠ ESCALATED' : '';
+      const deadLine = dl.label ? `\n     Publish-ready deadline: ${dl.label}` : '';
+      if (!author) hasMissingOwnership = true;
+      return [
+        `    📄 ${num ? num + ' — ' : ''}${name}`,
+        `       Status:          ${status}${flagEsc}`,
+        `       Document Author: ${author || '⚠ Not assigned — please assign'}`,
+        `       Next Review:     ${nxtRev || '—'}${deadLine}`,
+      ].join('\n');
+    }).join('\n\n');
+
+    ownerSections +=
+      `\nProcess Owner: ${owner}${noOwner ? '  ⚠ UNASSIGNED' : ''}\n` +
+      `${'─'.repeat(50)}\n` + docLines + '\n';
+  });
+
+  const missingNote = hasMissingOwnership
+    ? `\nNote: One or more documents below are missing a Process Owner or Document Author. ` +
+      `Please coordinate to assign ownership so these documents can progress to publication.\n`
+    : '';
+
+  const text =
+    `Subject: Action Required: Document Review & Approval\n\n` +
+    `Hi ${approverName},\n\n` +
+    `I'm reaching out regarding ${pending.length} document${pending.length !== 1 ? 's' : ''} ` +
+    `under your approval that require attention. Each document should be updated, peer reviewed, ` +
+    `and ready to publish within 45 days of its scheduled Next Review Date (deadline shown per document below).` +
+    missingNote + `\n` + ownerSections +
+    `\nPlease coordinate with each Process Owner to ensure documents are on track. ` +
+    `If you have any questions or blockers, please reach out as soon as possible.\n\n` +
+    `Thank you for your attention to this matter.`;
+
+  copyToClipboard(text);
+  const orig = btn.textContent;
+  btn.textContent = '✓ Copied!';
+  setTimeout(() => { btn.textContent = orig; }, 2500);
+}
+
+// Shared document line for all escalation emails.
+// Format: doc name (+ URL on next line if available) then one detail line.
+function dcmEmailDocLine(r) {
+  const num       = dcmVal(r, 'Document #');
+  const name      = dcmVal(r, 'Document Name/Link') || '(Untitled)';
+  const url       = dcmEffective(r, 'Document URL');
+  const status    = dcmStatus(r) || '—';
+  const prep      = dcmEffective(r, 'Prepared By');
+  const prepFmt   = prep ? prep : '⚠ None';
+  const lastRev   = toDateInput(dcmEffective(r, 'Last Reviewed'));
+  const lastFmt   = lastRev
+    ? new Date(lastRev + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+    : '—';
+  const title = (num ? num + '  ' : '') + name;
+  return [
+    `  ${title}`,
+    url ? `  ${url}` : '',
+    `  ${status}  |  Prepared By: ${prepFmt}  |  Last Reviewed: ${lastFmt}`,
+  ].filter(Boolean).join('\n');
+}
+
+// Group rows by Process Owner; unassigned bucket sorted last.
+function dcmGroupByOwner(rows) {
+  const groups = {};
+  rows.forEach(r => {
+    const o = dcmEffective(r, 'Process Owner') || '(Unassigned)';
+    if (!groups[o]) groups[o] = [];
+    groups[o].push(r);
+  });
+  return groups;
+}
+
+function dcmOwnerSections(rows, promptFn) {
+  return Object.entries(dcmGroupByOwner(rows))
+    .sort((a, b) => {
+      if (a[0] === '(Unassigned)') return 1;
+      if (b[0] === '(Unassigned)') return -1;
+      return a[0].localeCompare(b[0]);
+    })
+    .map(([owner, docs]) => {
+      const label  = owner === '(Unassigned)' ? '⚠ No Process Owner' : owner;
+      const prompt = promptFn ? promptFn(owner, docs) : '';
+      return `${label}  (${docs.length})\n${'─'.repeat(48)}\n` +
+        (prompt ? prompt + '\n' : '') +
+        docs.map(dcmEmailDocLine).join('\n\n');
+    })
+    .join('\n\n');
+}
+
+function dcmCopyDone(btn) {
+  const orig = btn.textContent;
+  btn.textContent = '✓ Copied';
+  setTimeout(() => { btn.textContent = orig; }, 2500);
+}
+
+function copyEscalationEmail(btn) {
+  const escalated = dcmActiveRows().filter(dcmIsEscalated);
+  if (!escalated.length) { dcmCopyDone(btn); return; }
+
+  const totalDays = escalated.reduce((s, r) => s + (daysAgo(toDateInput(dcmEffective(r, 'Date Escalated'))) || 0), 0);
+  const avgDays   = Math.round(totalDays / escalated.length);
+  const maxDays   = Math.max(...escalated.map(r => daysAgo(toDateInput(dcmEffective(r, 'Date Escalated'))) || 0));
+  const noOwner   = escalated.filter(r => !dcmEffective(r, 'Process Owner')).length;
+
+  const sections = dcmOwnerSections(escalated, (owner) =>
+    owner === '(Unassigned)'
+      ? '  Needs an owner assigned before this can move forward.'
+      : `  ${owner} — who are you assigning to resolve each of these?`
+  );
+
+  const text =
+    `Subject: ${escalated.length} Escalated Document${escalated.length !== 1 ? 's' : ''} Need Your Attention\n\n` +
+    `Hi,\n\n` +
+    `${escalated.length} document${escalated.length !== 1 ? 's are' : ' is'} escalated in the Document Compliance Matrix.` +
+    (avgDays > 0 ? ` Average time in escalation: ${avgDays} day${avgDays !== 1 ? 's' : ''}. Longest: ${maxDays} days.` : '') + '\n\n' +
+    (noOwner ? `${noOwner} of these ${noOwner !== 1 ? 'have' : 'has'} no Process Owner and need one assigned first.\n\n` : '') +
+    `For each item below, please let me know who you're assigning to resolve it. Reply by ${nextFriday()}.\n\n` +
+    `${'─'.repeat(48)}\n\n` +
+    sections + '\n\n' +
+    `Let me know if you have questions or need anything from my end.\n\nThanks`;
+
+  copyToClipboard(text);
+  dcmCopyDone(btn);
+}
+
+function copyNoOwnerEmail(btn) {
+  const rows = dcmActiveRows().filter(r => !dcmEffective(r, 'Process Owner'));
+  if (!rows.length) { dcmCopyDone(btn); return; }
+
+  const sorted = [...rows].sort((a, b) =>
+    (dcmVal(a, 'Document #') || '').localeCompare(dcmVal(b, 'Document #') || ''));
+
+  const text =
+    `Subject: ${rows.length} Document${rows.length !== 1 ? 's' : ''} Need a Process Owner\n\n` +
+    `Hi,\n\n` +
+    `${rows.length} document${rows.length !== 1 ? 's' : ''} in the Document Compliance Matrix ` +
+    `${rows.length !== 1 ? 'have' : 'has'} no Process Owner. Without one, ${rows.length !== 1 ? 'they' : 'it'} ` +
+    `can't move through review.\n\n` +
+    `Please assign an owner for each and reply by ${nextFriday()}. If any should be archived, just let me know.\n\n` +
+    `${'─'.repeat(48)}\n\n` +
+    sorted.map(dcmEmailDocLine).join('\n\n') + '\n\n' +
+    `Thanks`;
+
+  copyToClipboard(text);
+  dcmCopyDone(btn);
+}
+
+function copyNoApproverEmail(btn) {
+  const rows = dcmActiveRows().filter(r => !dcmEffective(r, 'Document Approver'));
+  if (!rows.length) { dcmCopyDone(btn); return; }
+
+  const sections = dcmOwnerSections(rows);
+
+  const text =
+    `Subject: ${rows.length} Document${rows.length !== 1 ? 's' : ''} Need a Document Approver\n\n` +
+    `Hi,\n\n` +
+    `${rows.length} document${rows.length !== 1 ? 's' : ''} in the Document Compliance Matrix ` +
+    `${rows.length !== 1 ? 'have' : 'has'} no Document Approver assigned. Without one, ` +
+    `${rows.length !== 1 ? 'they' : 'it'} can't reach Published status.\n\n` +
+    `Please assign an approver for each item below and reply by ${nextFriday()}. ` +
+    `If approver responsibility needs discussion, flag it and we'll sort it out.\n\n` +
+    `${'─'.repeat(48)}\n\n` +
+    sections + '\n\n' +
+    `Thanks`;
+
+  copyToClipboard(text);
+  dcmCopyDone(btn);
+}
+
+function copyToClipboard(text) {
+  navigator.clipboard.writeText(text).catch(() => {
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select(); document.execCommand('copy');
+    document.body.removeChild(ta);
+  });
+}
+
+function renderDcmCharts(rows) {
+  const statusMap = {};
+  rows.forEach(r => { const s = dcmStatus(r) || '(blank)'; statusMap[s] = (statusMap[s]||0)+1; });
+  makeDcmDonut('dcm-chart-status', statusMap, DCM_COLOR);
+
+  const ownerMap = {};
+  rows.forEach(r => { const o = dcmEffective(r,'Process Owner') || '(Unassigned)'; ownerMap[o] = (ownerMap[o]||0)+1; });
+  makeHBar('dcm-chart-owner', ownerMap);
+
+  const approverMap = {};
+  rows.forEach(r => { const a = dcmEffective(r,'Document Approver') || '(Unassigned)'; approverMap[a] = (approverMap[a]||0)+1; });
+  makeHBar('dcm-chart-approver', approverMap);
+}
+
+function makeDcmDonut(id, data, colorMap) {
+  const ctx    = document.getElementById(id).getContext('2d');
+  const keys   = Object.keys(data).sort((a,b) => data[b]-data[a]);
+  const vals   = keys.map(k => data[k]);
+  const colors = keys.map((k,i) => colorMap[k] || PALETTE[i%PALETTE.length]);
+  const total  = vals.reduce((a,b) => a+b, 0);
+  if (charts[id]) charts[id].destroy();
+  charts[id] = new Chart(ctx, {
+    type: 'doughnut',
+    data: { labels: keys, datasets: [{ data: vals, backgroundColor: colors, borderWidth: 1, borderColor: '#fff' }] },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'bottom', labels: { font:{size:11}, padding:8, boxWidth:12 } },
+        tooltip: { callbacks: { label: c => ` ${c.label}: ${c.parsed} (${((c.parsed/total)*100).toFixed(0)}%)` }}
+      }
+    }
+  });
+}
+
+const DCM_COLS = [
+  { label: '',               sort: false, fn: r => '',                                            renderFn: r => dcmEditBtn(r) },
+  { label: 'Doc #',          sort: true,  fn: r => dcmVal(r, 'Document #') },
+  { label: 'Document Name',  sort: true,  fn: r => dcmVal(r, 'Document Name/Link'),              renderFn: r => dcmDocNameCell(r) },
+  { label: 'Status',         sort: true,  fn: r => dcmStatus(r),                                 renderFn: r => dcmStatusBadge(r) },
+  { label: 'Escalated',      sort: true,  fn: r => dcmEffective(r, 'Escalated'),                 renderFn: r => dcmEscBadge(r) },
+  { label: 'Rev',            sort: true,  fn: r => dcmEffective(r, 'Revision') },
+  { label: 'Published Date', sort: true,  fn: r => dcmEffective(r, 'Published Date'),            renderFn: r => dcmDateCell(r, 'Published Date', 'pub-date') },
+  { label: 'Process Owner',  sort: true,  fn: r => dcmEffective(r, 'Process Owner') },
+  { label: 'Approver',       sort: true,  fn: r => dcmEffective(r, 'Document Approver') },
+  { label: 'Prepared By',    sort: true,  fn: r => dcmEffective(r, 'Prepared By') },
+  { label: 'Last Reviewed',  sort: true,  fn: r => dcmEffective(r, 'Last Reviewed') },
+  { label: 'Next Review',    sort: true,  fn: r => dcmEffective(r, 'Next Review Date'),          renderFn: r => dcmDateCell(r, 'Next Review Date', 'review-date') },
+  { label: 'Notes',          sort: false, fn: r => dcmEffective(r, 'Notes'),                     renderFn: r => dcmNoteCell(r) },
+  { label: '',               sort: false, fn: r => '',                                            renderFn: r => dcmDeleteBtn(r) },
+];
+
+function dcmDateCell(r, field, cls) {
+  const v = dcmEffective(r, field);
+  if (!v) return '';
+  const label = esc(v);
+  return cls ? `<span class="dcm-date-${cls}">${label}</span>` : label;
+}
+
+function deadlineFrom(dateStr) {
+  if (!dateStr) return { label: '', iso: '' };
+  const d = new Date(dateStr);
+  if (isNaN(d)) return { label: '', iso: '' };
+  d.setDate(d.getDate() + 45);
+  if (d.getDay() === 6) d.setDate(d.getDate() + 2);
+  if (d.getDay() === 0) d.setDate(d.getDate() + 1);
+  return {
+    label: d.toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric', year:'numeric' }),
+    iso:   d.toISOString().slice(0,10)
+  };
+}
+
+function daysAgo(dateStr) {
+  if (!dateStr) return null;
+  const d = new Date(dateStr);
+  if (isNaN(d)) return null;
+  return Math.floor((Date.now() - d) / 86400000);
+}
+
+function dcmStatusBadge(r) {
+  const s = dcmStatus(r);
+  if (!s) return '';
+  const cls = DCM_BADGE[s] || 'b-pending';
+  const edited = dcmOverrides[dcmKey(r)] && dcmOverrides[dcmKey(r)]['Status'] ? ' title="Locally edited"' : '';
+  return `<span class="badge ${cls}"${edited}>${esc(s)}</span>`;
+}
+function dcmEscBadge(r) {
+  return dcmIsEscalated(r) ? '<span title="Escalated" style="color:#dc2626;font-size:14px">&#9888;</span>' : '';
+}
+function dcmDocNameCell(r) {
+  const name = dcmVal(r, 'Document Name/Link');
+  const url  = dcmEffective(r, 'Document URL');
+  if (!name) return '';
+  if (url) return `<a href="${esc(url)}" target="_blank" rel="noopener" title="${esc(url)}" style="color:#0284c7;text-decoration:underline">${esc(name)}</a>`;
+  return `<span class="truncate" title="${esc(name)}">${esc(name)}</span>`;
+}
+function dcmNoteCell(r) {
+  const v = dcmEffective(r, 'Notes');
+  if (!v) return '';
+  const short = v.length > 45 ? v.slice(0,43)+'\u2026' : v;
+  return `<span class="dcm-note-cell" title="${esc(v)}">${esc(short)}</span>`;
+}
+function dcmEditBtn(row) {
+  const k = dcmKey(row);
+  const open = dcmEditOpen.has(k);
+  return `<button class="dcm-edit-toggle${open?' active':''}"
+    onclick="toggleDcmEdit('${k.replace(/'/g,"\\'")}')">&#9998;</button>`;
+}
+
+function dcmDeleteBtn(row) {
+  const k    = dcmKey(row);
+  const spId = row._spId;
+  if (!spId) return '';
+  const safeK = (k||'').replace(/'/g,"\\'");
+  return `<button class="btn-delete" title="Delete from SharePoint"
+    onclick="deleteDcmRow('${spId}','${safeK}')">&#128465;</button>`;
+}
+
+function dcmSetGroup(label) {
+  dcmGroupCol = label || null;
+  dcmGroupCollapsed.clear();
+  renderDcmFiltered();
+}
+
+function toggleDcmGroup(val) {
+  if (dcmGroupCollapsed.has(val)) dcmGroupCollapsed.delete(val);
+  else dcmGroupCollapsed.add(val);
+  renderDcmFiltered();
+}
+
+async function deleteDcmRow(spId, k) {
+  if (!confirm('Delete this document from SharePoint? This cannot be undone.')) return;
+  try {
+    const resp = await fetch('/api/dcm-delete', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ id: spId })
+    });
+    const j = await resp.json();
+    if (j.error) throw new Error(j.error);
+    dcmItems = dcmItems.filter(r => String(r._spId) !== String(spId));
+    delete dcmOverrides[k];
+    saveDcmOverrides();
+    renderDcmFiltered();
+  } catch(e) {
+    alert('Delete failed: ' + e.message);
+  }
+}
+
+function renderDcmTableHeader() {
+  document.getElementById('dcm-table-head').innerHTML = '<tr>' +
+    DCM_COLS.map((c, i) => {
+      if (!c.sort) return `<th style="width:38px"></th>`;
+      const isGroup = dcmGroupCol === c.label;
+      const cls = isGroup ? 'sorted-asc' : (dcmSortCol === i ? (dcmSortDir==='asc' ? 'sorted-asc' : 'sorted-desc') : '');
+      const groupIndicator = isGroup ? ' &#8801;' : '';
+      return `<th class="${cls}" onclick="dcmSortBy(${i})">${c.label}${groupIndicator}<span></span></th>`;
+    }).join('') + '</tr>';
+}
+
+function dcmSortBy(i) {
+  if (!DCM_COLS[i].sort) return;
+  dcmSortDir = (dcmSortCol === i && dcmSortDir==='asc') ? 'desc' : 'asc';
+  dcmSortCol = i;
+  renderDcmTableHeader();
+  renderDcmFiltered();
+}
+
+function renderDcmTable(rows) {
+  let sorted = [...rows];
+  if (dcmSortCol !== null && DCM_COLS[dcmSortCol]?.sort) {
+    const fn = DCM_COLS[dcmSortCol].fn;
+    sorted.sort((a,b) => {
+      const av = String(fn(a)||'').toLowerCase(), bv = String(fn(b)||'').toLowerCase();
+      return dcmSortDir==='asc' ? av.localeCompare(bv) : bv.localeCompare(av);
+    });
+  }
+  const colSpan = DCM_COLS.length;
+
+  function rowHtml(row) {
+    const k         = dcmKey(row);
+    const hasEdit   = k && Object.keys(dcmOverrides[k]||{}).length > 0;
+    const rowCls    = dcmIsArchived(row) ? 'row-closed' : dcmIsEscalated(row) ? 'row-escalated' : '';
+    const editedCls = hasEdit ? ' dcm-row-edited' : '';
+    const cells = DCM_COLS.map(c => {
+      const rendered = c.renderFn ? c.renderFn(row) : '';
+      const text     = String(c.fn(row)||'');
+      let cell = rendered || '';
+      if (!rendered && text.length > 50)
+        cell = `<span class="truncate" title="${esc(text)}">${esc(text)}</span>`;
+      else if (!rendered)
+        cell = esc(text);
+      return `<td>${cell}</td>`;
+    }).join('');
+    let out = `<tr class="${rowCls}${editedCls}">${cells}</tr>`;
+    if (k && dcmEditOpen.has(k)) out += dcmEditRowHtml(row);
+    return out;
+  }
+
+  let html = '';
+  if (dcmGroupCol) {
+    const groupColDef = DCM_COLS.find(c => c.label === dcmGroupCol);
+    const groupFn = groupColDef ? groupColDef.fn : r => '';
+    const groups = {};
+    const groupOrder = [];
+    sorted.forEach(row => {
+      const gv = String(groupFn(row)||'(Blank)');
+      if (!groups[gv]) { groups[gv] = []; groupOrder.push(gv); }
+      groups[gv].push(row);
+    });
+    groupOrder.forEach(gv => {
+      const collapsed = dcmGroupCollapsed.has(gv);
+      const arrow = collapsed ? '&#9654;' : '&#9660;';
+      html += `<tr class="group-header" data-gv="${esc(gv)}" onclick="toggleDcmGroup(this.dataset.gv)">
+        <td colspan="${colSpan}"><span class="group-toggle">${arrow}</span>${esc(gv)} <span style="color:var(--muted);font-weight:400">(${groups[gv].length})</span></td>
+      </tr>`;
+      if (!collapsed) groups[gv].forEach(row => { html += rowHtml(row); });
+    });
+  } else {
+    sorted.forEach(row => { html += rowHtml(row); });
+  }
+
+  document.getElementById('dcm-table-body').innerHTML =
+    html || `<tr><td colspan="${colSpan}" class="no-data">No records found</td></tr>`;
+}
+
+function toggleDcmEdit(k) {
+  if (dcmEditOpen.has(k)) dcmEditOpen.delete(k);
+  else                    dcmEditOpen.add(k);
+  renderDcmFiltered();
+}
+
+function dcmEditRowHtml(row) {
+  const k          = dcmKey(row);
+  const ov         = dcmOverrides[k] || {};
+  const status      = dcmStatus(row);
+  const isEsc       = dcmIsEscalated(row);
+  const revision    = dcmEffective(row, 'Revision');
+  const owner       = dcmEffective(row, 'Process Owner');
+  const approver    = dcmEffective(row, 'Document Approver');
+  const preparedBy  = dcmEffective(row, 'Prepared By');
+  const docUrl      = dcmEffective(row, 'Document URL');
+  const reviewed    = toDateInput(dcmEffective(row, 'Last Reviewed'));
+  const assigned    = toDateInput(dcmEffective(row, 'Date Assigned'));
+  const escDate     = toDateInput(dcmEffective(row, 'Date Escalated'));
+  const pubDate     = toDateInput(dcmEffective(row, 'Published Date'));
+  const nextReview  = toDateInput(dcmEffective(row, 'Next Review Date'));
+  const notes       = dcmEffective(row, 'Notes');
+  const hasOv       = Object.keys(ov).length > 0;
+  const safeK       = k.replace(/'/g,"\\'");
+
+  const statusOpts  = ['Published','Peer Review','In Progress','Final Approval','Archived']
+    .map(s => `<option${status===s?' selected':''}>${s}</option>`).join('');
+  const peopleOpts  = dcmPeopleList().map(p => `<option>${esc(p)}</option>`).join('');
+
+  return `<tr class="dcm-edit-row">
+    <td colspan="${DCM_COLS.length}">
+      <div class="dcm-edit-form">
+        <div class="dcm-edit-fields">
+          <div class="dcm-edit-field">
+            <label>Status</label>
+            <select onchange="dcmAutoSave('${safeK}','Status',this.value)">${statusOpts}</select>
+          </div>
+          <div class="dcm-edit-field">
+            <label>Escalated</label>
+            <label class="dcm-check-label">
+              <input type="checkbox" ${isEsc?'checked':''}
+                     onchange="dcmAutoSave('${safeK}','Escalated',this.checked?'Yes':'No')">
+              Flag as escalated
+            </label>
+          </div>
+          <div class="dcm-edit-field" style="min-width:80px">
+            <label>Revision</label>
+            <input type="number" min="0" step="1" value="${esc(revision)}"
+                   onchange="dcmAutoSave('${safeK}','Revision',this.value)" style="width:80px">
+          </div>
+          <div class="dcm-edit-field" style="min-width:220px;flex:1">
+            <label>Document URL</label>
+            <input type="url" value="${esc(docUrl)}" placeholder="https://…"
+                   onchange="dcmAutoSave('${safeK}','Document URL',this.value)" style="width:100%">
+          </div>
+          <div class="dcm-edit-field" style="min-width:170px">
+            <label>Process Owner</label>
+            <input list="dcm-people-list-${esc(k)}" value="${esc(owner)}"
+                   onchange="dcmAutoSave('${safeK}','Process Owner',this.value)">
+          </div>
+          <div class="dcm-edit-field" style="min-width:170px">
+            <label>Document Approver</label>
+            <input list="dcm-people-list-${esc(k)}" value="${esc(approver)}"
+                   onchange="dcmAutoSave('${safeK}','Document Approver',this.value)">
+          </div>
+          <div class="dcm-edit-field" style="min-width:170px">
+            <label>Prepared By</label>
+            <input list="dcm-people-list-${esc(k)}" value="${esc(preparedBy)}"
+                   onchange="dcmAutoSave('${safeK}','Prepared By',this.value)">
+          </div>
+          <datalist id="dcm-people-list-${esc(k)}">${peopleOpts}</datalist>
+          <div class="dcm-edit-field" style="min-width:140px">
+            <label>Date Assigned</label>
+            <input type="date" value="${esc(assigned)}"
+                   onchange="dcmAutoSave('${safeK}','Date Assigned',this.value)">
+          </div>
+          <div class="dcm-edit-field" style="min-width:140px">
+            <label>Last Reviewed</label>
+            <input type="date" value="${esc(reviewed)}"
+                   onchange="dcmAutoSave('${safeK}','Last Reviewed',this.value)">
+          </div>
+          <div class="dcm-edit-field" style="min-width:140px">
+            <label>Next Review Date</label>
+            <input type="date" value="${esc(nextReview)}"
+                   onchange="dcmAutoSave('${safeK}','Next Review Date',this.value)">
+          </div>
+          <div class="dcm-edit-field" style="min-width:140px">
+            <label style="color:var(--amber)">Date Escalated <span style="font-size:9px;font-weight:400">(auto)</span></label>
+            <input type="date" value="${esc(escDate)}"
+                   onchange="dcmAutoSave('${safeK}','Date Escalated',this.value)">
+          </div>
+          <div class="dcm-edit-field" style="min-width:140px">
+            <label style="color:var(--green)">Published Date <span style="font-size:9px;font-weight:400">(auto)</span></label>
+            <input type="date" value="${esc(pubDate)}"
+                   onchange="dcmAutoSave('${safeK}','Published Date',this.value)">
+          </div>
+        </div>
+        <div class="dcm-edit-notes-row">
+          <label>Notes &amp; Comments</label>
+          <textarea rows="2" placeholder="Add notes or comments\u2026"
+                    onblur="dcmAutoSave('${safeK}','Notes',this.value)">${esc(notes)}</textarea>
+        </div>
+        <div class="dcm-edit-actions">
+          ${hasOv ? `<button class="btn btn-sm btn-danger"
+              onclick="clearDcmOverride('${safeK}')">&#8635; Reset to original</button>` : ''}
+          <button class="btn btn-sm" style="background:#0ea5e9;color:#fff"
+              onclick="saveDcmRow('${safeK}', '${esc(String(row._spId || ''))}')">
+            &#128190; Save to SharePoint
+          </button>
+          <span class="dcm-saved-msg" id="dcm-saved-${esc(k)}"></span>
+        </div>
+      </div>
+    </td>
+  </tr>`;
+}
+
+function dcmAutoSave(k, field, value) {
+  if (!dcmOverrides[k]) dcmOverrides[k] = {};
+  dcmOverrides[k][field] = value;
+
+  const today = new Date().toISOString().slice(0, 10);
+
+  if (field === 'Escalated') {
+    dcmOverrides[k]['Date Escalated'] = (value === 'Yes') ? today : '';
+  }
+
+  if (field === 'Status' && value === 'Published') {
+    if (!dcmOverrides[k]['Published Date']) {
+      dcmOverrides[k]['Published Date'] = today;
+    }
+    const row = dcmItems.find(r => dcmKey(r) === k);
+    if (row) {
+      const cur = parseInt(dcmEffective(row, 'Revision') || '0', 10);
+      dcmOverrides[k]['Revision'] = String(isNaN(cur) ? 1 : cur + 1);
+    }
+    dcmOverrides[k]['Escalated']      = 'No';
+    dcmOverrides[k]['Date Escalated'] = '';
+  }
+
+  saveDcmOverrides();
+
+  const msg = document.getElementById('dcm-saved-' + k);
+  if (msg) { msg.style.color = ''; msg.textContent = '\u270E Unsaved'; }
+  renderDcmFiltered();
+}
+
+function clearDcmOverride(k) {
+  delete dcmOverrides[k];
+  saveDcmOverrides();
+  renderDcmFiltered();
+}
+
+// Apply first-load defaults (Date Assigned, Next Review Date, escalation logic)
+function applyDcmDefaults(writeToSp) {
+  loadDcmOverrides();
+  const today = new Date().toISOString().slice(0, 10);
+  const savesToMake = [];
+
+  dcmItems.forEach(row => {
+    const k = dcmKey(row);
+    if (!k) return;
+    if (!dcmOverrides[k]) dcmOverrides[k] = {};
+    const ov   = dcmOverrides[k];
+    const spId = row._spId;
+
+    if (!dcmVal(row, 'Date Assigned') && !ov['Date Assigned']) {
+      ov['Date Assigned'] = '2026-01-01';
+      if (writeToSp && spId) savesToMake.push({ id: spId, fields: { 'Date Assigned': '2026-01-01' } });
+    }
+
+    if (!dcmVal(row, 'Next Review Date') && !ov['Next Review Date']) {
+      ov['Next Review Date'] = '2026-05-01';
+      if (writeToSp && spId) savesToMake.push({ id: spId, fields: { 'Next Review Date': '2026-05-01' } });
+    }
+
+    const status = (dcmVal(row, 'Status') || '').trim().toLowerCase();
+    const notEscalated = ['published','final approval','archived'];
+    const alreadyEscalated = dcmVal(row, 'Escalated') === 'Yes';
+    const userSetNo = ov['Escalated'] === 'No';
+    if (!notEscalated.includes(status) && !alreadyEscalated && !userSetNo) {
+      ov['Escalated']      = 'Yes';
+      ov['Date Escalated'] = ov['Date Escalated'] || today;
+      if (writeToSp && spId) savesToMake.push({ id: spId, fields: { 'Escalated': 'Yes', 'Date Escalated': today } });
+    }
+
+    if (Object.keys(ov).length === 0) delete dcmOverrides[k];
+  });
+
+  saveDcmOverrides();
+
+  if (writeToSp) {
+    savesToMake.forEach(s =>
+      fetch('/api/dcm-save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(s)
+      }).catch(() => {})
+    );
+  }
+}
+
+// ====================================================================
+// File upload fallback
+// ====================================================================
+function onDcmDragOver(e) { e.preventDefault(); document.getElementById('drop-zone').classList.add('drag-over'); }
+function onDcmDragLeave()  { document.getElementById('drop-zone').classList.remove('drag-over'); }
+function onDcmDrop(e) {
+  e.preventDefault();
+  document.getElementById('drop-zone').classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if (file) processDcmFile(file);
+}
+function handleDcmFileInput(e) {
+  const file = e.target.files[0];
+  if (file) processDcmFile(file);
+  e.target.value = '';
+}
+
+function processDcmFile(file) {
+  const reader = new FileReader();
+  reader.onload = ev => processDcmBuffer(ev.target.result, file.name);
+  reader.readAsArrayBuffer(file);
+}
+
+function processDcmBuffer(buf, fileName) {
+  try {
+    const wb = XLSX.read(new Uint8Array(buf), { type: 'array', cellDates: true });
+    const sheetName = wb.SheetNames.find(n => n === 'Document Compliance Matrix') ||
+                      wb.SheetNames.find(n => n.toLowerCase().includes('compliance')) ||
+                      wb.SheetNames[0];
+    const ws   = wb.Sheets[sheetName];
+    const rows = XLSX.utils.sheet_to_json(ws, { raw: false, dateNF: 'yyyy-mm-dd' });
+    dcmItems   = rows.filter(r => dcmVal(r, 'Document #') || dcmVal(r, 'Document Name/Link'));
+    if (!dcmItems.length) throw new Error('No document rows found. Check sheet has "Document #" or "Document Name/Link" columns.');
+
+    applyDcmDefaults(false);  // file-mode: don't write back to SP
+    dataSource = 'file';
+
+    document.getElementById('auth-overlay').classList.add('hidden');
+    document.getElementById('main-page').style.display = '';
+    document.getElementById('btn-refresh').disabled = true; // can't refresh a file
+    document.getElementById('btn-change-source').style.display = '';
+    if (fileName) {
+      document.getElementById('source-chip').textContent = fileName;
+      document.getElementById('source-chip').style.display = '';
+    }
+
+    renderDcm();
+  } catch (err) {
+    alert('Could not parse file: ' + err.message);
+  }
+}
+
+// ====================================================================
+// Boot
+// ====================================================================
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MSAL + Graph API — replaces the Python local server (launch.sh)
+//
+// SETUP: Register an Azure AD app at https://portal.azure.com
+//   → Azure Active Directory → App registrations → New registration
+//   → Name: "ASI Document Compliance Matrix"
+//   → Redirect URI (SPA): the full HTTPS URL of this file in SharePoint
+//   → API permissions: Microsoft Graph → Sites.Read.All + Sites.ReadWrite.All (delegated)
+//   → Copy the Application (client) ID and paste below as 99c832f3-a882-49c3-bbae-f8ca152e34b3
+// ═══════════════════════════════════════════════════════════════════════════
+const _MSAL_CONFIG = {
+  auth: {
+    clientId: '99c832f3-a882-49c3-bbae-f8ca152e34b3',  // ← Paste your Azure AD App client ID here
+    authority: 'https://login.microsoftonline.com/794c042e-da02-4688-96e8-1ddf59b497ff',
+    redirectUri: 'https://autonomoussolutions.sharepoint.com/sites/productppps/_layouts/15/blank.aspx',
+  },
+  cache: { cacheLocation: 'sessionStorage', storeAuthStateInCookie: true }
+};
+const _SCOPES   = ['https://graph.microsoft.com/Sites.Read.All', 'https://graph.microsoft.com/Sites.ReadWrite.All'];
+const _SITE     = 'autonomoussolutions.sharepoint.com:/sites/productppps:';
+const _DCM_LIST = 'Document Compliance Matrix';
+
+let _msalInstance = null;
+const _origFetch  = window.fetch.bind(window);
+
+async function _getMsal() {
+  if (!_msalInstance) {
+    _msalInstance = new msal.PublicClientApplication(_MSAL_CONFIG);
+    await _msalInstance.initialize();
+    // Intercept all /api/ calls and route to Graph API
+    window.fetch = async (url, opts) => {
+      if (typeof url === 'string' && url.startsWith('/api/')) return _apiRouter(url, opts);
+      return _origFetch(url, opts);
+    };
+  }
+  return _msalInstance;
+}
+
+async function _getToken() {
+  const inst     = await _getMsal();
+  const accounts = inst.getAllAccounts();
+  const req      = { scopes: _SCOPES, account: accounts[0] };
+  if (accounts.length > 0) {
+    try { return (await inst.acquireTokenSilent(req)).accessToken; } catch(e) {}
+  }
+  return (await inst.acquireTokenPopup({ scopes: _SCOPES })).accessToken;
+}
+
+// ── Graph API router — intercepts fetch('/api/...') calls ───────────────────
+async function _apiRouter(url, opts) {
+  const method = (opts && opts.method) || 'GET';
+  const body   = (opts && opts.body)   ? JSON.parse(opts.body) : null;
+  const ok = (d, status=200) => new Response(JSON.stringify(d), {
+    status, headers: { 'Content-Type': 'application/json' }
+  });
+
+  try {
+    if (url === '/api/auth-status') return ok({ status:'ready', label:'Microsoft 365' });
+    if (url === '/api/refresh')     return ok({ ok:true });
+
+    if (url === '/api/sp-people') {
+      // Return current user; extend with Graph /users for full org lookup if needed
+      const inst = await _getMsal();
+      const acct = inst.getAllAccounts()[0];
+      return ok(acct ? [{ id:0, name:acct.name, email:acct.username }] : []);
+    }
+
+    if (url === '/api/data') {
+      const token = await _getToken();
+      const r = await _origFetch(
+        `https://graph.microsoft.com/v1.0/sites/${_SITE}/lists/${encodeURIComponent(_DCM_LIST)}/items?$expand=fields&$top=500`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (!r.ok) throw new Error('Graph HTTP ' + r.status);
+      const data  = await r.json();
+      const items = (data.value || []).map(i => ({ ...i.fields, _graphId: i.id }));
+      const cols  = {};
+      Object.keys(items[0] || {}).forEach(k => {
+        cols[k] = k.replace(/_x0020_/g,' ').replace(/_x002e_/g,'.');
+      });
+      return ok({ mode:'live', items, columns:cols, fetchedAt: new Date().toISOString() });
+    }
+
+    if (url === '/api/dcm-save') {
+      const token = await _getToken();
+      const { id, fields } = body;
+      const r = await _origFetch(
+        `https://graph.microsoft.com/v1.0/sites/${_SITE}/lists/${encodeURIComponent(_DCM_LIST)}/items/${id}/fields`,
+        {
+          method: 'PATCH',
+          headers: { Authorization:`Bearer ${token}`, 'Content-Type':'application/json' },
+          body: JSON.stringify(fields)
+        }
+      );
+      if (!r.ok) { const e=await r.json(); throw new Error(e.error?.message||'Save failed'); }
+      return ok({ ok:true });
+    }
+
+    return ok({ error:'Unknown route: '+url }, 404);
+  } catch(e) {
+    console.error('[DCM API Router]', url, e);
+    return ok({ error: e.message }, 500);
+  }
+}
+
+async function _msalSignIn() {
+  setAuthStep('starting');
+  document.getElementById('auth-connecting-msg').textContent = 'Signing in…';
+  await _msalLoadData();
+}
+
+async function _msalLoadData() {
+  try {
+    await _getMsal();
+    const token = await _getToken();
+    setAuthStep('starting');
+    document.getElementById('auth-connecting-msg').textContent = 'Loading from SharePoint…';
+    await loadLiveData('Microsoft 365');
+  } catch(e) {
+    console.error('DCM auth/load error:', e);
+    const el = document.getElementById('auth-error-msg');
+    if (el) el.textContent = 'Error: ' + e.message;
+    setAuthStep('error');
+  }
+}
+
+document.addEventListener('DOMContentLoaded', async () => {
+  await _getMsal(); // sets up fetch interceptor before any React/JS renders
+  const inst     = await _getMsal();
+  const accounts = inst.getAllAccounts();
+  if (accounts.length > 0) {
+    // Previously signed in — try silent refresh
+    setAuthStep('starting');
+    document.getElementById('auth-connecting-msg').textContent = 'Reconnecting to SharePoint…';
+    await _msalLoadData();
+  } else {
+    // First visit — show sign-in prompt
+    setAuthStep('device');
+  }
+});
+
+// ====================================================================
+// SharePoint save — explicit buttons (auto-save lookup was unreliable)
+// ====================================================================
+async function saveDcmRow(k, spId) {
+  const msgEl = document.getElementById('dcm-saved-' + k);
+  const setMsg = (text, color, ms) => {
+    if (!msgEl) return;
+    msgEl.style.color = color;
+    msgEl.textContent = text;
+    if (ms) setTimeout(() => { if (msgEl) { msgEl.textContent = ''; msgEl.style.color = ''; } }, ms);
+  };
+
+  if (!spId) { setMsg('\u2717 No SP ID \u2014 cannot save', '#f87171', 6000); return; }
+  const overrides = dcmOverrides[k];
+  if (!overrides || !Object.keys(overrides).length) { setMsg('(no changes)', '#94a3b8', 2000); return; }
+
+  setMsg('Saving\u2026', '#94a3b8', 0);
+  try {
+    const resp = await fetch('/api/dcm-save', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ id: spId, fields: Object.assign({}, overrides) })
+    });
+    const j = await resp.json();
+    if (j.error) throw new Error(j.error);
+    setMsg('\u2713 Saved to SharePoint', '#4ade80', 4000);
+  } catch(e) {
+    setMsg('\u2717 ' + e.message.slice(0, 60), '#f87171', 8000);
+    console.error('saveDcmRow error (k=' + k + ', spId=' + spId + '):', e);
+  }
+}
+
+async function saveAllDcmRows(btn) {
+  if (dataSource !== 'live') { alert('Not connected to SharePoint.'); return; }
+  if (!btn) btn = document.getElementById('btn-save-all');
+  if (btn) { btn.disabled = true; btn.textContent = 'Saving\u2026'; }
+
+  const toSave = [];
+  dcmItems.forEach(row => {
+    const k    = dcmKey(row);
+    const spId = row._spId;
+    if (k && spId && dcmOverrides[k] && Object.keys(dcmOverrides[k]).length) {
+      toSave.push({ k, spId, fields: Object.assign({}, dcmOverrides[k]) });
+    }
+  });
+
+  if (!toSave.length) {
+    if (btn) { btn.disabled = false; btn.textContent = '\u2191 Save All to SharePoint'; }
+    alert('No pending changes to save.');
+    return;
+  }
+
+  let saved = 0, failed = 0;
+  for (const item of toSave) {
+    const msgEl = document.getElementById('dcm-saved-' + item.k);
+    if (msgEl) { msgEl.style.color = '#94a3b8'; msgEl.textContent = 'Saving\u2026'; }
+    try {
+      const resp = await fetch('/api/dcm-save', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ id: item.spId, fields: item.fields })
+      });
+      const j = await resp.json();
+      if (j.error) throw new Error(j.error);
+      saved++;
+      if (msgEl) { msgEl.style.color = '#4ade80'; msgEl.textContent = '\u2713 Saved'; setTimeout(() => { if (msgEl) { msgEl.textContent = ''; msgEl.style.color = ''; } }, 4000); }
+    } catch(e) {
+      failed++;
+      if (msgEl) { msgEl.style.color = '#f87171'; msgEl.textContent = '\u2717 Error'; setTimeout(() => { if (msgEl) { msgEl.textContent = ''; msgEl.style.color = ''; } }, 8000); }
+      console.error('saveAllDcmRows error for', item.k, ':', e);
+    }
+  }
+
+  if (btn) { btn.disabled = false; btn.textContent = '\u2191 Save All to SharePoint'; }
+  alert('Saved ' + saved + ' of ' + toSave.length + ' row' + (toSave.length !== 1 ? 's' : '') + '.' +
+        (failed ? ' ' + failed + ' failed \u2014 check /api/log for details.' : ''));
+}
+
+async function saveApproverDcmRows(approverName, btn) {
+  if (dataSource !== 'live') { alert('Not connected to SharePoint.'); return; }
+  const origText = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = 'Saving\u2026'; }
+
+  const toSave = [];
+  dcmItems.forEach(row => {
+    const k    = dcmKey(row);
+    const spId = row._spId;
+    const name = (dcmEffective(row, 'Document Approver') || '(Unassigned)');
+    if (k && spId && name === approverName && dcmOverrides[k] && Object.keys(dcmOverrides[k]).length) {
+      toSave.push({ k, spId, fields: Object.assign({}, dcmOverrides[k]) });
+    }
+  });
+
+  if (!toSave.length) {
+    if (btn) { btn.disabled = false; btn.textContent = origText; }
+    alert('No pending changes for this approver.');
+    return;
+  }
+
+  let saved = 0, failed = 0;
+  for (const item of toSave) {
+    const msgEl = document.getElementById('dcm-saved-' + item.k);
+    if (msgEl) { msgEl.style.color = '#94a3b8'; msgEl.textContent = 'Saving\u2026'; }
+    try {
+      const resp = await fetch('/api/dcm-save', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ id: item.spId, fields: item.fields })
+      });
+      const j = await resp.json();
+      if (j.error) throw new Error(j.error);
+      saved++;
+      if (msgEl) { msgEl.style.color = '#4ade80'; msgEl.textContent = '\u2713 Saved'; setTimeout(() => { if (msgEl) { msgEl.textContent = ''; msgEl.style.color = ''; } }, 4000); }
+    } catch(e) {
+      failed++;
+      if (msgEl) { msgEl.style.color = '#f87171'; msgEl.textContent = '\u2717 Error'; setTimeout(() => { if (msgEl) { msgEl.textContent = ''; msgEl.style.color = ''; } }, 8000); }
+      console.error('saveApproverDcmRows error for', item.k, ':', e);
+    }
+  }
+
+  if (btn) { btn.disabled = false; }
+  renderApproverSection(dcmActiveRows());
+  alert('Saved ' + saved + ' of ' + toSave.length + ' row' + (toSave.length !== 1 ? 's' : '') + '.' +
+        (failed ? ' ' + failed + ' failed \u2014 check /api/log for details.' : ''));
+}
+
+// ====================================================================
+// Add Document modal
+// ====================================================================
+function showAddDocModal() {
+  document.getElementById('add-doc-form').reset();
+  document.getElementById('add-doc-error').textContent = '';
+  document.getElementById('add-doc-modal').style.display = 'flex';
+  document.getElementById('add-doc-title').focus();
+}
+
+function hideAddDocModal() {
+  document.getElementById('add-doc-modal').style.display = 'none';
+}
+
+async function submitAddDocModal() {
+  const errEl = document.getElementById('add-doc-error');
+  errEl.textContent = '';
+
+  const fields = {};
+  const docNum  = document.getElementById('add-doc-title').value.trim();
+  const docName = document.getElementById('add-doc-name').value.trim();
+  const status  = document.getElementById('add-doc-status').value;
+  const owner   = document.getElementById('add-doc-owner').value.trim();
+  const approver= document.getElementById('add-doc-approver').value.trim();
+  const rev     = document.getElementById('add-doc-revision').value.trim();
+  const notes   = document.getElementById('add-doc-notes').value.trim();
+
+  if (!docNum) { errEl.textContent = 'Document # is required.'; return; }
+
+  fields['Document #'] = docNum;
+  if (docName)   fields['Document Name/Link'] = docName;
+  if (status)    fields['Status']             = status;
+  if (owner)     fields['Process Owner']      = owner;
+  if (approver)  fields['Document Approver']  = approver;
+  if (rev !== '') fields['Revision']          = rev;
+  if (notes)     fields['Notes']              = notes;
+
+  const btn = document.getElementById('add-doc-submit');
+  btn.disabled = true;
+  btn.textContent = 'Saving\u2026';
+
+  try {
+    const resp = await fetch('/api/dcm-create', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ fields })
+    });
+    const json = await resp.json();
+    if (!resp.ok || json.error) throw new Error(json.error || `HTTP ${resp.status}`);
+    hideAddDocModal();
+    // Add the new row locally so it appears immediately without re-auth
+    const newRow = { _spId: String(json.id) };
+    newRow['Document #']         = docNum;
+    if (docName)   newRow['Document Name/Link'] = docName;
+    if (status)    newRow['Status']             = status;
+    if (owner)     newRow['Process Owner']      = owner;
+    if (approver)  newRow['Document Approver']  = approver;
+    if (rev !== '') newRow['Revision']           = rev;
+    if (notes)     newRow['Notes']              = notes;
+    dcmItems.push(newRow);
+    renderDcm();
+  } catch(e) {
+    errEl.textContent = 'Error: ' + e.message;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Add Document';
+  }
+}
+</script>
+
+<!-- Add Document Modal -->
+<div id="add-doc-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);
+     z-index:1000;align-items:center;justify-content:center">
+  <div style="background:#1e293b;border:1px solid #334155;border-radius:10px;padding:28px 32px;
+              min-width:400px;max-width:520px;width:90%;color:#e2e8f0;box-shadow:0 8px 32px rgba(0,0,0,.5)">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+      <h2 style="margin:0;font-size:1.1rem;font-weight:600">Add New Document</h2>
+      <button onclick="hideAddDocModal()"
+              style="background:none;border:none;color:#94a3b8;font-size:1.4rem;cursor:pointer;line-height:1">&times;</button>
+    </div>
+    <form id="add-doc-form" onsubmit="event.preventDefault();submitAddDocModal()">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+        <div style="grid-column:1/-1">
+          <label style="display:block;font-size:.8rem;color:#94a3b8;margin-bottom:4px">Document # <span style="color:#f87171">*</span></label>
+          <input id="add-doc-title" type="text" placeholder="e.g. POL-001"
+                 style="width:100%;box-sizing:border-box;background:#0f172a;border:1px solid #475569;
+                        border-radius:5px;padding:7px 10px;color:#e2e8f0;font-size:.9rem">
+        </div>
+        <div style="grid-column:1/-1">
+          <label style="display:block;font-size:.8rem;color:#94a3b8;margin-bottom:4px">Document Name / Link</label>
+          <input id="add-doc-name" type="text" placeholder="Document title or URL"
+                 style="width:100%;box-sizing:border-box;background:#0f172a;border:1px solid #475569;
+                        border-radius:5px;padding:7px 10px;color:#e2e8f0;font-size:.9rem">
+        </div>
+        <div>
+          <label style="display:block;font-size:.8rem;color:#94a3b8;margin-bottom:4px">Status</label>
+          <select id="add-doc-status"
+                  style="width:100%;background:#0f172a;border:1px solid #475569;
+                         border-radius:5px;padding:7px 10px;color:#e2e8f0;font-size:.9rem">
+            <option value="">-- Select --</option>
+            <option>In Progress</option>
+            <option>Peer Review</option>
+            <option>Final Approval</option>
+            <option>Published</option>
+            <option>Archived</option>
+          </select>
+        </div>
+        <div>
+          <label style="display:block;font-size:.8rem;color:#94a3b8;margin-bottom:4px">Revision</label>
+          <input id="add-doc-revision" type="number" min="0" step="1" placeholder="0"
+                 style="width:100%;box-sizing:border-box;background:#0f172a;border:1px solid #475569;
+                        border-radius:5px;padding:7px 10px;color:#e2e8f0;font-size:.9rem">
+        </div>
+        <div>
+          <label style="display:block;font-size:.8rem;color:#94a3b8;margin-bottom:4px">Process Owner</label>
+          <input id="add-doc-owner" type="text"
+                 style="width:100%;box-sizing:border-box;background:#0f172a;border:1px solid #475569;
+                        border-radius:5px;padding:7px 10px;color:#e2e8f0;font-size:.9rem">
+        </div>
+        <div>
+          <label style="display:block;font-size:.8rem;color:#94a3b8;margin-bottom:4px">Document Approver</label>
+          <input id="add-doc-approver" type="text"
+                 style="width:100%;box-sizing:border-box;background:#0f172a;border:1px solid #475569;
+                        border-radius:5px;padding:7px 10px;color:#e2e8f0;font-size:.9rem">
+        </div>
+        <div style="grid-column:1/-1">
+          <label style="display:block;font-size:.8rem;color:#94a3b8;margin-bottom:4px">Notes</label>
+          <textarea id="add-doc-notes" rows="2" placeholder="Optional notes\u2026"
+                    style="width:100%;box-sizing:border-box;background:#0f172a;border:1px solid #475569;
+                           border-radius:5px;padding:7px 10px;color:#e2e8f0;font-size:.9rem;resize:vertical"></textarea>
+        </div>
+      </div>
+      <div id="add-doc-error" style="color:#f87171;font-size:.82rem;margin-top:10px;min-height:1.2em"></div>
+      <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:18px">
+        <button type="button" onclick="hideAddDocModal()"
+                style="background:none;border:1px solid #475569;border-radius:5px;padding:7px 18px;
+                       color:#94a3b8;cursor:pointer;font-size:.9rem">Cancel</button>
+        <button id="add-doc-submit" type="submit"
+                style="background:#16a34a;border:none;border-radius:5px;padding:7px 18px;
+                       color:#fff;cursor:pointer;font-size:.9rem;font-weight:600">Add Document</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+</body>
+</html>

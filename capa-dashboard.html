@@ -1,0 +1,2781 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:mso="urn:schemas-microsoft-com:office:office" xmlns:msdt="uuid:C2F41010-65B3-11d1-A29F-00AA00C14882">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CAPA Dashboard — ASI Product PPS</title>
+
+  <!-- React & ReactDOM (UMD, React 18) -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <!-- Babel (JSX transpilation in-browser) -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <!-- Chart.js (all-in-one UMD — no peer deps) -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js"></script>
+
+  <style>
+    :root {
+      --blue-dk:  #1e3a5f;
+      --blue:     #2563eb;
+      --blue-lt:  #dbeafe;
+      --red:      #dc2626;
+      --red-lt:   #fee2e2;
+      --amber:    #d97706;
+      --green:    #16a34a;
+      --green-lt: #dcfce7;
+      --purple:   #7c3aed;
+      --teal:     #0891b2;
+      --g50:  #f8fafc;
+      --g100: #f1f5f9;
+      --g200: #e2e8f0;
+      --g300: #cbd5e1;
+      --g500: #64748b;
+      --g700: #334155;
+      --g900: #0f172a;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+      background: var(--g100);
+      color: var(--g900);
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    /* ── Header ─────────────────────────────────────────────── */
+    .hdr {
+      background: var(--blue-dk);
+      color: white;
+      padding: 0 28px;
+      height: 60px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: 0 2px 10px rgba(0,0,0,.25);
+      position: sticky; top: 0; z-index: 50;
+    }
+    .hdr-l { display:flex; align-items:center; gap:13px; }
+    .hdr-mark {
+      width:34px; height:34px; border-radius:7px;
+      background: linear-gradient(135deg,#0ea5e9,#2563eb);
+      display:flex; align-items:center; justify-content:center;
+      font-weight:800; font-size:12px; color:white; letter-spacing:-.5px; flex-shrink:0;
+    }
+    .hdr-title { font-size:15px; font-weight:600; }
+    .hdr-sub   { font-size:11px; color:#93c5fd; }
+    .hdr-badge {
+      background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.2);
+      border-radius:20px; padding:4px 12px; font-size:11px; color:#bfdbfe;
+    }
+
+    /* ── Nav ────────────────────────────────────────────────── */
+    .nav {
+      background:white; border-bottom:1px solid var(--g200);
+      padding:0 28px; display:flex;
+    }
+    .nav-btn {
+      padding:13px 17px; font-size:13px; font-weight:500; color:var(--g500);
+      cursor:pointer; border:none; border-bottom:2px solid transparent;
+      background:none; display:flex; align-items:center; gap:6px;
+      transition:color .15s, border-color .15s;
+    }
+    .nav-btn:hover:not([disabled]) { color:var(--blue); }
+    .nav-btn.on { color:var(--blue); border-bottom-color:var(--blue); }
+
+    /* ── Print / PDF export ── */
+    @media print {
+      .hdr, .nav, .footer, .mr-no-print { display: none !important; }
+      .main { padding: 0 !important; }
+      .mr-print-hdr { display: block !important; }
+      body { background: #fff; }
+      .chart-card { break-inside: avoid; }
+      .mr-kpi-row { break-inside: avoid; }
+    }
+    .mr-print-hdr { display: none; }
+        .nav-btn[disabled] { opacity:.4; cursor:default; }
+    .nbadge {
+      background:var(--red-lt); color:var(--red);
+      border-radius:20px; padding:1px 7px; font-size:11px; font-weight:700;
+    }
+
+    /* ── Layout ─────────────────────────────────────────────── */
+    .main { padding:22px 28px; max-width:1440px; margin:0 auto; }
+    .slabel {
+      font-size:11px; font-weight:700; text-transform:uppercase;
+      letter-spacing:.06em; color:var(--g500); margin-bottom:11px; margin-top:26px;
+    }
+    .slabel:first-child { margin-top:0; }
+
+    /* ── Phase Banner ───────────────────────────────────────── */
+    .banner {
+      background:#fffbeb; border:1px solid #fde68a; border-radius:8px;
+      padding:9px 15px; margin-bottom:22px; font-size:12.5px; color:#92400e;
+      display:flex; align-items:center; gap:9px;
+    }
+
+    /* ── KPI Grid ───────────────────────────────────────────── */
+    .kpi-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; }
+    .kpi {
+      background:white; border-radius:10px; padding:18px 20px 16px;
+      border:1px solid var(--g200);
+      box-shadow:0 1px 3px rgba(0,0,0,.06);
+      position:relative; overflow:hidden;
+    }
+    .kpi::after {
+      content:''; position:absolute; top:0; left:0; right:0; height:3px; border-radius:10px 10px 0 0;
+    }
+    .kpi.c-blue::after  { background:var(--blue); }
+    .kpi.c-red::after   { background:var(--red); }
+    .kpi.c-green::after { background:var(--green); }
+    .kpi.c-amber::after { background:var(--amber); }
+    .kpi-ico { position:absolute; top:15px; right:15px; font-size:20px; opacity:.1; }
+    .kpi-lbl { font-size:11.5px; font-weight:500; color:var(--g500); margin-bottom:8px; }
+    .kpi-val { font-size:38px; font-weight:700; line-height:1; margin-bottom:5px; font-variant-numeric:tabular-nums; }
+    .kpi-val.c-blue  { color:var(--blue); }
+    .kpi-val.c-red   { color:var(--red); }
+    .kpi-val.c-green { color:var(--green); }
+    .kpi-val.c-amber { color:var(--amber); }
+    .kpi-sub { font-size:12px; color:var(--g500); }
+    .kpi-tgt { font-size:11px; font-weight:600; margin-top:7px; display:flex; align-items:center; gap:3px; }
+    .kpi-tgt.ok   { color:var(--green); }
+    .kpi-tgt.fail { color:var(--red); }
+
+    /* ── Charts ─────────────────────────────────────────────── */
+    .chart-grid { display:grid; grid-template-columns:2fr 1fr 1fr; gap:14px; }
+    .chart-card {
+      background:white; border-radius:10px; padding:18px 20px;
+      border:1px solid var(--g200); box-shadow:0 1px 3px rgba(0,0,0,.06);
+    }
+    .chart-title { font-size:13.5px; font-weight:600; color:var(--g700); margin-bottom:2px; }
+    .chart-sub   { font-size:11.5px; color:var(--g500); margin-bottom:14px; }
+    .chart-wrap  { position:relative; }
+
+    /* ── Tables ─────────────────────────────────────────────── */
+    .tbl-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+    .tbl-card {
+      background:white; border-radius:10px;
+      border:1px solid var(--g200); box-shadow:0 1px 3px rgba(0,0,0,.06); overflow:hidden;
+    }
+    .tbl-hdr {
+      padding:14px 18px; border-bottom:1px solid var(--g200);
+      display:flex; align-items:center; justify-content:space-between;
+    }
+    .tbl-title  { font-size:13.5px; font-weight:600; color:var(--g700); }
+    .tbl-count  { background:var(--g100); border-radius:20px; padding:2px 10px; font-size:12px; font-weight:600; color:var(--g500); }
+    .tbl-count.danger { background:var(--red-lt); color:var(--red); }
+    .scroll-x   { overflow-x:auto; }
+    table       { width:100%; border-collapse:collapse; }
+    th {
+      background:var(--g50); padding:8px 13px; text-align:left;
+      font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:.05em;
+      color:var(--g500); border-bottom:1px solid var(--g200); white-space:nowrap;
+    }
+    td { padding:10px 13px; border-bottom:1px solid var(--g100); font-size:12.5px; color:var(--g700); }
+    tr:last-child td { border-bottom:none; }
+    tr.od-row { background:#fff5f5; }
+    tr.od-row:hover td { background:#fee2e2; }
+    tr:not(.od-row):hover td { background:var(--g50); }
+
+    /* ── Badges ─────────────────────────────────────────────── */
+    .bdg { display:inline-block; padding:2px 8px; border-radius:20px; font-size:11px; font-weight:600; white-space:nowrap; }
+    .s-new    { background:#e0f2fe; color:#0369a1; }
+    .s-asgn   { background:#ede9fe; color:#6d28d9; }
+    .s-prog   { background:#fef9c3; color:#854d0e; }
+    .s-rev    { background:#fce7f3; color:#9d174d; }
+    .s-clsd   { background:var(--green-lt); color:#15803d; }
+    .s-canc   { background:var(--g100); color:var(--g500); }
+    .t-corr   { background:#dbeafe; color:#1d4ed8; }
+    .t-prev   { background:#ede9fe; color:#6d28d9; }
+    .t-ofi    { background:#ccfbf1; color:#0f766e; }
+    .p-hi  { background:#fee2e2; color:#b91c1c; }
+    .p-med { background:#fef3c7; color:#92400e; }
+    .p-lo  { background:#f0fdf4; color:#166534; }
+    .od-pill { display:inline-block; padding:2px 8px; border-radius:20px; font-size:11px; font-weight:700; background:var(--red-lt); color:var(--red); }
+
+    /* ── Submit CTA ─────────────────────────────────────────── */
+    .cta {
+      background:linear-gradient(135deg,#1e3a5f 0%,#1e40af 100%);
+      border-radius:10px; padding:20px 26px;
+      display:flex; align-items:center; justify-content:space-between; color:white;
+    }
+    .cta h3 { font-size:14.5px; font-weight:600; margin-bottom:3px; }
+    .cta p  { font-size:12.5px; color:#bfdbfe; }
+    .cta-btn {
+      background:white; color:var(--blue-dk); padding:9px 22px;
+      border-radius:7px; font-size:13px; font-weight:700;
+      cursor:pointer; border:none; flex-shrink:0; margin-left:22px;
+    }
+    .cta-btn:hover { background:#f0f9ff; }
+
+    /* ── Full Log (CAR Log tab) ──────────────────────────────── */
+    .log-card {
+      background:white; border-radius:10px;
+      border:1px solid var(--g200); box-shadow:0 1px 3px rgba(0,0,0,.06); overflow:hidden;
+    }
+    .log-hdr {
+      padding:16px 20px; border-bottom:1px solid var(--g200);
+      display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;
+    }
+    .pills { display:flex; gap:5px; flex-wrap:wrap; }
+    .pill {
+      padding:4px 13px; border-radius:20px; font-size:12px; font-weight:500;
+      cursor:pointer; border:1px solid var(--g300); background:white; color:var(--g700);
+      transition:all .12s;
+    }
+    .pill:hover { border-color:var(--blue); color:var(--blue); }
+    .pill.on    { background:var(--blue); color:white; border-color:var(--blue); }
+
+    /* ── Footer ─────────────────────────────────────────────── */
+    .footer {
+      text-align:center; padding:18px; color:var(--g500); font-size:11.5px; margin-top:10px;
+    }
+
+    /* ── Responsive ─────────────────────────────────────────── */
+    @media(max-width:1100px){ .chart-grid{grid-template-columns:1fr 1fr;} .kpi-grid{grid-template-columns:repeat(2,1fr);} }
+    @media(max-width:720px) { .chart-grid{grid-template-columns:1fr;} .tbl-grid{grid-template-columns:1fr;} .kpi-grid{grid-template-columns:repeat(2,1fr);} .cta{flex-direction:column; align-items:flex-start; gap:12px;} .cta-btn{margin-left:0;} }
+
+    /* ── Auth Overlay ────────────────────────────────────────────────────────── */
+    #auth-overlay {
+      position:fixed; inset:0; background:rgba(15,23,42,.7);
+      display:flex; align-items:center; justify-content:center;
+      z-index:999; backdrop-filter:blur(3px);
+    }
+    #auth-overlay.hidden { display:none; }
+    .auth-card {
+      background:white; border-radius:14px; padding:36px 40px;
+      max-width:440px; width:90%; box-shadow:0 20px 60px rgba(0,0,0,.25);
+      text-align:center;
+    }
+    .auth-logo { width:48px; height:48px; background:linear-gradient(135deg,#0ea5e9,#2563eb); border-radius:10px; display:inline-flex; align-items:center; justify-content:center; font-weight:800; font-size:16px; color:white; margin-bottom:18px; }
+    .auth-card h2 { font-size:19px; font-weight:700; color:#0f172a; margin-bottom:6px; }
+    .auth-sub { font-size:13px; color:#64748b; margin-bottom:28px; }
+    .auth-step { display:none; }
+    .auth-step.active { display:block; }
+    .auth-spinner { width:32px; height:32px; border:3px solid #e2e8f0; border-top-color:#2563eb; border-radius:50%; animation:spin .8s linear infinite; margin:0 auto 16px; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+    .auth-msg  { font-size:13px; color:#475569; margin-bottom:4px; }
+    .auth-chip { display:inline-block; background:#f1f5f9; border-radius:20px; padding:3px 12px; font-size:11px; color:#64748b; margin-top:8px; }
+    .auth-code-box { background:#f8fafc; border:2px dashed #e2e8f0; border-radius:10px; padding:18px; margin:16px 0; cursor:pointer; }
+    .auth-code-box:hover { border-color:#2563eb; background:#eff6ff; }
+    .auth-code { font-family:"Courier New",monospace; font-size:28px; font-weight:700; letter-spacing:4px; color:#1e3a5f; }
+    .auth-code-hint { font-size:11px; color:#94a3b8; margin-top:6px; }
+    .auth-url-btn { display:inline-block; background:#2563eb; color:white; border-radius:7px; padding:10px 22px; font-size:13px; font-weight:600; text-decoration:none; margin-bottom:14px; }
+    .auth-url-btn:hover { background:#1d4ed8; }
+    .auth-steps-ol { text-align:left; font-size:12.5px; color:#475569; line-height:1.8; padding-left:18px; margin:12px 0; }
+    .auth-skip-btn { background:none; border:1px solid #e2e8f0; border-radius:6px; padding:6px 14px; font-size:12px; color:#94a3b8; cursor:pointer; margin-top:10px; }
+    .auth-skip-btn:hover { border-color:#94a3b8; color:#475569; }
+    .auth-err-icon { font-size:32px; margin-bottom:12px; }
+    .auth-err-msg { font-size:13px; color:#dc2626; margin-bottom:18px; background:#fee2e2; border-radius:8px; padding:10px 14px; }
+    .auth-retry-btn { background:#2563eb; color:white; border:none; border-radius:7px; padding:10px 22px; font-size:13px; font-weight:600; cursor:pointer; }
+    .auth-retry-btn:hover { background:#1d4ed8; }
+    .auth-divider { color:#94a3b8; font-size:12px; margin:18px 0 14px; }
+    .auth-sample-btn { background:none; border:1px solid #e2e8f0; border-radius:7px; padding:8px 18px; font-size:12px; color:#64748b; cursor:pointer; }
+    .auth-sample-btn:hover { border-color:#2563eb; color:#2563eb; }
+    .live-chip { display:inline-flex; align-items:center; gap:5px; background:#dcfce7; color:#15803d; border-radius:20px; padding:3px 10px; font-size:11px; font-weight:600; }
+    .live-dot { width:6px; height:6px; background:#22c55e; border-radius:50%; animation:pulse 2s ease-in-out infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+    .copy-toast { position:fixed; bottom:24px; left:50%; transform:translateX(-50%) translateY(40px); background:#0f172a; color:white; padding:8px 18px; border-radius:8px; font-size:13px; opacity:0; transition:all .25s; pointer-events:none; z-index:9999; }
+    .copy-toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+  </style>
+
+<!--[if gte mso 9]><xml>
+<mso:CustomDocumentProperties>
+<mso:_ApprovalStatus msdt:dt="string">0</mso:_ApprovalStatus>
+<mso:_ApprovalAssignedTo msdt:dt="string"></mso:_ApprovalAssignedTo>
+<mso:_ApprovalRespondedBy msdt:dt="string"></mso:_ApprovalRespondedBy>
+<mso:_ApprovalSentBy msdt:dt="string"></mso:_ApprovalSentBy>
+<mso:DocumentTitle msdt:dt="string">CAPA Dashboard — ASI Product PPS</mso:DocumentTitle>
+</mso:CustomDocumentProperties>
+</xml><![endif]-->
+</head>
+<body>
+<!-- Auth Overlay (shown when running via launch.sh/launch.bat) -->
+<div id="auth-overlay" class="hidden">
+  <div class="auth-card">
+    <div class="auth-logo">ASI</div>
+    <h2>CAPA Dashboard</h2>
+    <div class="auth-sub">Connecting to SharePoint&hellip;</div>
+
+    <!-- Starting / silent check -->
+    <div id="auth-step-starting" class="auth-step active">
+      <div class="auth-spinner"></div>
+      <div class="auth-msg" id="auth-connecting-msg">Initializing&hellip;</div>
+    </div>
+
+    <!-- MSAL Sign-in prompt -->
+    <div id="auth-step-device" class="auth-step">
+      <p style="font-size:13px;color:#334155;margin-bottom:20px;line-height:1.5;">
+        Sign in with your ASI Microsoft 365 account to load live CAR data from SharePoint.
+      </p>
+      <button onclick="_msalSignIn()" style="background:#0055b3;color:#fff;border:none;border-radius:6px;padding:10px 24px;font-size:14px;font-weight:600;cursor:pointer;width:100%;">
+        &#128274;&nbsp; Sign in with Microsoft
+      </button>
+      <p style="font-size:11px;color:#94a3b8;margin-top:12px;">
+        A Microsoft sign-in popup will open. Your session is cached — you only sign in once per browser session.
+      </p>
+    </div>
+
+    <!-- Fetching data -->
+    <div id="auth-step-fetching" class="auth-step">
+      <div class="auth-spinner"></div>
+      <div class="auth-msg">Loading CAR Log from SharePoint&hellip;</div>
+      <div class="auth-chip" id="auth-fetch-label"></div>
+    </div>
+
+    <!-- Error -->
+    <div id="auth-step-error" class="auth-step">
+      <div class="auth-err-icon">&#9888;</div>
+      <div class="auth-err-msg" id="auth-error-msg">Authentication failed.</div>
+      <button class="auth-retry-btn" onclick="retryAuth()">&#8635; Retry sign-in</button>
+    </div>
+
+    <div class="auth-divider">&mdash;&nbsp; or use sample data &nbsp;&mdash;</div>
+    <button class="auth-sample-btn" onclick="useSampleData()">Continue with sample data</button>
+  </div>
+</div>
+
+<div class="copy-toast" id="copy-toast">Code copied!</div>
+
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useEffect, useRef } = React;
+
+// ── ─────────────────────────────────────────────────────────────────────────
+// Phase 2: Live SharePoint connection
+// When served from localhost (via launch.sh) the dashboard polls /api/ endpoints.
+// When opened as a file:// it uses sample data below.
+// ─────────────────────────────────────────────────────────────────────────────
+const IS_LIVE = window.location.protocol === 'https:';
+
+// Auth overlay helpers (plain JS, outside React)
+let _pollTimer = null;
+let _lastStatus = '';
+let _failCount  = 0;
+
+function showAuthOverlay() {
+  document.getElementById('auth-overlay').classList.remove('hidden');
+  _setAuthStep('starting');
+  document.getElementById('auth-connecting-msg').textContent = 'Connecting to Microsoft…';
+}
+function hideAuthOverlay() {
+  document.getElementById('auth-overlay').classList.add('hidden');
+}
+function _setAuthStep(name) {
+  document.querySelectorAll('.auth-step').forEach(el => el.classList.remove('active'));
+  const el = document.getElementById('auth-step-' + name);
+  if (el) el.classList.add('active');
+}
+function copyCode() {
+  const code = document.getElementById('auth-user-code').textContent;
+  if (!code) return;
+  navigator.clipboard.writeText(code).then(() => {
+    const t = document.getElementById('copy-toast');
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 2000);
+  }).catch(() => {});
+}
+function skipAuth() { /* no-op — device code auth removed */ }
+function retryAuth() { _msalSignIn(); }
+function useSampleData() {
+  _stopPoll();
+  hideAuthOverlay();
+  // React app is already rendering with CARS sample data — just hide the overlay
+}
+
+function _startPoll() {
+  _stopPoll();
+  _pollAuthStatus();
+  _pollTimer = setInterval(_pollAuthStatus, 2500);
+}
+function _stopPoll() {
+  if (_pollTimer) { clearInterval(_pollTimer); _pollTimer = null; }
+}
+
+async function _pollAuthStatus() {
+  try {
+    const r = await fetch('/api/auth-status');
+    if (!r.ok) { _failCount++; if (_failCount >= 5) _onServerDown(); return; }
+    _failCount = 0;
+    const s = await r.json();
+    _updateAuthUI(s);
+    if (['ready','error','declined'].includes(s.status)) _stopPoll();
+  } catch(e) {
+    _failCount++;
+    if (_failCount >= 5) _onServerDown();
+  }
+}
+
+function _onServerDown() {
+  _stopPoll();
+  document.getElementById('auth-error-msg').textContent =
+    'Cannot reach the local server. Close the terminal and re-run launch.sh.';
+  _setAuthStep('error');
+}
+
+function _updateAuthUI(state) {
+  const s = state.status;
+  if (s === _lastStatus && s !== 'device_code') return;
+  _lastStatus = s;
+  switch(s) {
+    case 'starting': case 'connecting':
+      document.getElementById('auth-connecting-msg').textContent =
+        state.label ? 'Trying ' + state.label + '…' : 'Connecting to Microsoft…';
+      _setAuthStep('starting');
+      break;
+    case 'device_code': {
+      const code = state.user_code || '';
+      const url  = state.verification_uri || 'https://microsoft.com/devicelogin';
+      document.getElementById('auth-user-code').textContent = code;
+      document.getElementById('auth-url-btn').href = url;
+      document.getElementById('auth-url-btn').textContent = 'Open ' + url.replace('https://','');
+      document.getElementById('auth-app-label').textContent = state.label || '';
+      _setAuthStep('device');
+      break;
+    }
+    case 'fetching':
+      document.getElementById('auth-fetch-label').textContent = state.label || '';
+      _setAuthStep('fetching');
+      break;
+    case 'ready':
+      _loadLiveData(state.label);
+      break;
+    case 'declined':
+      document.getElementById('auth-error-msg').textContent = 'Sign-in was cancelled.';
+      _setAuthStep('error');
+      break;
+    case 'error':
+      document.getElementById('auth-error-msg').textContent = state.message || 'Authentication failed.';
+      _setAuthStep('error');
+      break;
+  }
+}
+
+// Live data loader — called when auth completes
+let _liveData   = null;   // { items, columns, col_types, fetchedAt }
+let _onDataLoad = null;   // callback set by React app
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MSAL + Graph API — replaces the Python local server (launch.sh)
+//
+// SETUP: Register an Azure AD app at https://portal.azure.com
+//   → Azure Active Directory → App registrations → New registration
+//   → Name: "ASI CAPA Dashboard"
+//   → Redirect URI (SPA): the full HTTPS URL of this file in SharePoint
+//   → API permissions: Microsoft Graph → Sites.Read.All + Sites.ReadWrite.All (delegated)
+//   → Copy the Application (client) ID and paste below
+// ═══════════════════════════════════════════════════════════════════════════
+const _MSAL_CONFIG = {
+  auth: {
+    clientId: '99c832f3-a882-49c3-bbae-f8ca152e34b3',  // ← Paste your Azure AD App client ID here
+    authority: 'https://login.microsoftonline.com/794c042e-da02-4688-96e8-1ddf59b497ff',
+    redirectUri: 'https://autonomoussolutions.sharepoint.com/sites/productppps/_layouts/15/blank.aspx',
+  },
+  cache: { cacheLocation: 'sessionStorage', storeAuthStateInCookie: true }
+};
+const _SCOPES = [
+  'https://graph.microsoft.com/Sites.Read.All',
+  'https://graph.microsoft.com/Sites.ReadWrite.All'
+];
+const _SITE   = 'autonomoussolutions.sharepoint.com:/sites/productppps:';
+const _LIST   = 'CAR Log';
+
+let _msalInstance = null;
+const _origFetch  = window.fetch.bind(window);
+
+async function _getMsal() {
+  if (!_msalInstance) {
+    _msalInstance = new msal.PublicClientApplication(_MSAL_CONFIG);
+    await _msalInstance.initialize();
+    // Intercept all /api/ calls and route to Graph API
+    window.fetch = async (url, opts) => {
+      if (typeof url === 'string' && url.startsWith('/api/')) return _apiRouter(url, opts);
+      return _origFetch(url, opts);
+    };
+  }
+  return _msalInstance;
+}
+
+async function _getToken() {
+  const inst     = await _getMsal();
+  const accounts = inst.getAllAccounts();
+  const req      = { scopes: _SCOPES, account: accounts[0] };
+  if (accounts.length > 0) {
+    try { return (await inst.acquireTokenSilent(req)).accessToken; } catch(e) {}
+  }
+  return (await inst.acquireTokenPopup({ scopes: _SCOPES })).accessToken;
+}
+
+// ── Graph API router — intercepts fetch('/api/...') calls ───────────────────
+async function _apiRouter(url, opts) {
+  const method = (opts && opts.method) || 'GET';
+  const body   = (opts && opts.body)   ? JSON.parse(opts.body) : null;
+  const ok = (d, status=200) => new Response(JSON.stringify(d), {
+    status, headers: { 'Content-Type': 'application/json' }
+  });
+
+  try {
+    if (url === '/api/auth-status') return ok({ status:'ready', label:'Microsoft 365' });
+    if (url === '/api/skip-auth' || url === '/api/refresh') return ok({ ok:true });
+
+    if (url === '/api/me') {
+      const inst = await _getMsal();
+      const acct = inst.getAllAccounts()[0];
+      return ok({ name: acct?.name || acct?.username || '' });
+    }
+
+    if (url === '/api/users') {
+      // Return current user; extend via Graph /users if you need the full org list
+      const inst = await _getMsal();
+      const acct = inst.getAllAccounts()[0];
+      return ok({ users: acct ? [{ id:0, name:acct.name, email:acct.username }] : [] });
+    }
+
+    if (url === '/api/data') {
+      const token = await _getToken();
+      const r = await _origFetch(
+        `https://graph.microsoft.com/v1.0/sites/${_SITE}/lists/${encodeURIComponent(_LIST)}/items?$expand=fields&$top=500`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (!r.ok) throw new Error('Graph HTTP ' + r.status);
+      const data  = await r.json();
+      const items = (data.value || []).map(i => ({ ...i.fields, _graphId: i.id }));
+      const cols  = {};
+      Object.keys(items[0] || {}).forEach(k => {
+        cols[k] = k.replace(/_x0020_/g,' ').replace(/_x002e_/g,'.');
+      });
+      return ok({ mode:'live', items, columns:cols, fetchedAt: new Date().toISOString() });
+    }
+
+    if (url === '/api/update') {
+      const token = await _getToken();
+      const { id, fields } = body;
+      const r = await _origFetch(
+        `https://graph.microsoft.com/v1.0/sites/${_SITE}/lists/${encodeURIComponent(_LIST)}/items/${id}/fields`,
+        {
+          method: 'PATCH',
+          headers: { Authorization:`Bearer ${token}`, 'Content-Type':'application/json' },
+          body: JSON.stringify(fields)
+        }
+      );
+      if (!r.ok) { const e=await r.json(); throw new Error(e.error?.message||'Update failed'); }
+      return ok({ ok:true });
+    }
+
+    if (url === '/api/submit') {
+      const token = await _getToken();
+      const r = await _origFetch(
+        `https://graph.microsoft.com/v1.0/sites/${_SITE}/lists/${encodeURIComponent(_LIST)}/items`,
+        {
+          method: 'POST',
+          headers: { Authorization:`Bearer ${token}`, 'Content-Type':'application/json' },
+          body: JSON.stringify({ fields: body })
+        }
+      );
+      if (!r.ok) { const e=await r.json(); throw new Error(e.error?.message||'Submit failed'); }
+      const created = await r.json();
+      return ok({ ok:true, id:created.id, no:created.fields?.Title||'' });
+    }
+
+    return ok({ error:'Unknown route: '+url }, 404);
+  } catch(e) {
+    console.error('[API Router]', url, e);
+    return ok({ error: e.message }, 500);
+  }
+}
+
+async function _msalSignIn() {
+  _setAuthStep('starting');
+  document.getElementById('auth-connecting-msg').textContent = 'Signing in…';
+  await _loadLiveData();
+}
+
+async function _loadLiveData(label) {
+  try {
+    await _getMsal(); // ensures fetch is intercepted before React calls it
+    const token = await _getToken();
+    _setAuthStep('fetching');
+    const r = await _origFetch(
+      `https://graph.microsoft.com/v1.0/sites/${_SITE}/lists/${encodeURIComponent(_LIST)}/items?$expand=fields&$top=500`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    if (!r.ok) throw new Error('Graph HTTP ' + r.status);
+    const data  = await r.json();
+    const items = (data.value || []).map(i => ({ ...i.fields, _graphId: i.id }));
+    if (!items.length) throw new Error('No items returned from SharePoint CAR Log.');
+    const cols  = {};
+    Object.keys(items[0]).forEach(k => { cols[k] = k.replace(/_x0020_/g,' ').replace(/_x002e_/g,'.'); });
+    const json  = { mode:'live', items, columns:cols, fetchedAt: new Date().toISOString() };
+    _liveData = json;
+    hideAuthOverlay();
+    if (_onDataLoad) _onDataLoad(json);
+  } catch(e) {
+    console.error('CAPA load error:', e);
+    const el = document.getElementById('auth-error-msg');
+    if (el) el.textContent = 'Error: ' + e.message;
+    _setAuthStep('error');
+  }
+}
+
+// ── SharePoint field auto-mapper ─────────────────────────────────────────────
+// Tries common column name patterns then falls back to discovered column names.
+function mapSPFields(fields, columns) {
+  // Build a lookup: displayName (normalised) → internalName
+  const byDisplay = {};
+  Object.entries(columns || {}).forEach(([internal, display]) => {
+    const key = display.toLowerCase().replace(/[\s_\-#?]/g,'');
+    byDisplay[key] = internal;
+  });
+
+  const get = (...candidates) => {
+    for (const n of candidates) {
+      const v = fields[n];
+      if (v !== undefined && v !== null && v !== '') return v;
+    }
+    // Also try normalised display-name lookup
+    for (const n of candidates) {
+      const key = n.toLowerCase().replace(/[\s_\-#?]/g,'');
+      const internal = byDisplay[key];
+      if (internal && fields[internal] !== undefined && fields[internal] !== null) return fields[internal];
+    }
+    return null;
+  };
+
+  // Person fields come back as { LookupValue, Email } or as a string
+  const getPerson = (...names) => {
+    const v = get(...names);
+    if (!v) return null;
+    if (typeof v === 'object') return v.LookupValue || v.Title || v.displayName || null;
+    return String(v);
+  };
+
+  // Scan all columns by display-name pattern — catches any internal name variant
+  const getByPattern = (pattern) => {
+    const re = new RegExp(pattern, 'i');
+    for (const [internal, display] of Object.entries(columns || {})) {
+      if (re.test(display)) {
+        const v = fields[internal];
+        if (v !== undefined && v !== null && v !== '') {
+          if (typeof v === 'object') return v.LookupValue || v.Title || v.displayName || null;
+          return String(v);
+        }
+      }
+    }
+    return null;
+  };
+
+  // SharePoint REST returns Id (capital I, lowercase d) as the item primary key
+  const id = fields.Id || fields.id || fields.ID || fields['_x0049_D'] || '?';
+  // Use SP row Id as the identifier — more reliable than custom number fields
+  const carNo = '#' + String(id);
+  const proc  = get('Process') || '';
+
+  // Build a short process code (e.g. "QP-02")
+  const procCode = (proc.match(/QP-\d+|QF-\d+|QM-\d+/) || [''])[0];
+
+  return {
+    id:        id,
+    no:        carNo,
+    submitted: get('Date_x0020_Submitted','DateSubmitted','Date Submitted','Created') || null,
+    by:        getPerson('Submitted_x0020_By','SubmittedBy','Author','Submitted By') ||
+               getByPattern('submitted.*by|created.*by') || 'Unknown',
+    type:      get('CARType','Type','CAR_x0020_Type') || getByPattern('^type$|car.*type') || '',
+    source:    get('Source') || '',
+    proc:      procCode || proc.split(' ').slice(0,2).join(' ') || '',
+    pname:     proc.split(' ').slice(1).join(' ') || proc,
+    pri:       get('Priority') || 'Medium',
+    brief:     get('Title') || getByPattern('brief.*description|summary|title') || '',
+    desc:      get('LongDescription','Long_x0020_Description','Brief_x0020_Description',
+                   'BriefDescription','Brief Description','Description') || '',
+    status:    get('Status') || 'New',
+    owner:     getPerson('Assigned_x0020_To','AssignedTo','Assigned To','Owner','CAROwner') ||
+               getByPattern('assigned.*to|owner') || null,
+    assigned:  get('Date_x0020_Assigned','DateAssigned','Date Assigned') ||
+               getByPattern('date.*assigned|assigned.*date') || null,
+    due:       get('Due_x0020_Date','DueDate','Due Date') ||
+               getByPattern('due.*date|target.*date') || null,
+    closed:    get('Date_x0020_Closed','DateClosed','Date Closed','Closure_x0020_Date','ClosureDate') ||
+               getByPattern('date.*closed|closed.*date|closure.*date|completion.*date') || null,
+    daysClose: get('Days_x0020_to_x0020_Close','DaystoClose','Days to Close') || null,
+    containment: stripHtml(get('Containment_x0020_Action','ContainmentAction','Containment Action') ||
+               getByPattern('containment') || ''),
+    rootCause:   stripHtml(get('Root_x0020_Cause','RootCause','Root Cause') ||
+               getByPattern('root.*cause') || ''),
+    actionPlan:  stripHtml(get('Action_x0020_Plan','ActionPlan','Action Plan') ||
+               getByPattern('action.*plan') || ''),
+    dateActionCompleted: get('Action_x0020_Complete_x0020_Date','ActionCompleteDate',
+                             'Date Action Completed','Action Complete Date') ||
+               getByPattern('action.*complete') || null,
+    result:    get('Result','Verification_x0020_Result') ||
+               getByPattern('^result$') || '',
+    followUp:  !!get('Follow_x002D_up_x0020_Required_x003F_','FollowupRequired',
+                     'Follow-up Required?','Follow_x002D_up_x0020_Required',
+                     'Long_x0020_Term_x0020_Follow_x002D_Up_x0020_Req_x0027_d_x003F_'),
+    rca:       !!(get('Root_x0020_Cause','RootCause','Root Cause') ||
+               getByPattern('root.*cause')),
+    ca:        !!(get('Containment_x0020_Action','ContainmentAction','Containment Action') ||
+               getByPattern('containment')),
+    notes:     get('Notes','Comments','Observation') ||
+               getByPattern('^notes?$|^comments?$') || '',
+  };
+}
+
+// Bootstrap — runs once when page loads
+async function bootstrapApp() {
+  if (IS_LIVE) {
+    const inst     = await _getMsal(); // sets up fetch interceptor
+    const accounts = inst.getAllAccounts();
+    if (accounts.length > 0) {
+      // Previously signed in — try silent token refresh first
+      showAuthOverlay();
+      _setAuthStep('starting');
+      document.getElementById('auth-connecting-msg').textContent = 'Reconnecting to SharePoint…';
+      await _loadLiveData();
+    } else {
+      // First visit — show sign-in prompt
+      showAuthOverlay();
+      _setAuthStep('device');
+    }
+  }
+}
+
+
+/* ════════════════════════════════════════════════════════════
+   SAMPLE DATA  — mirrors live SharePoint CAR Log
+   11 CARs · 9 overdue · 1 closed · today = 2026-03-24
+   ════════════════════════════════════════════════════════════ */
+const TODAY = new Date('2026-03-24');
+
+const CARS = [
+  { id:1,  no:'CAR-2025-001', submitted:'2025-08-12', by:'R. Patel',    type:'Corrective', source:'Internal Audit',          proc:'QP-02', pname:'Internal Audit',          pri:'Medium', status:'Closed',       owner:'S. Kim',    assigned:'2025-08-13', due:'2026-03-15', closed:'2026-03-10', daysClose:210, result:'Pass',    followUp:false, rca:true,  ca:true,  desc:'Calibration records for 3 instruments in Lab B were past due. Instruments were in active service outside calibration window.' },
+  { id:2,  no:'CAR-2025-002', submitted:'2025-10-14', by:'Jed Judd',    type:'Corrective', source:'Customer Feedback',        proc:'QP-09', pname:'Project Management',      pri:'High',   status:'In Progress',  owner:'D. Thomas', assigned:'2025-10-15', due:'2025-12-15', closed:null,         daysClose:null,result:'Pending', followUp:false, rca:false, ca:true,  desc:'Customer reported delivery of wrong firmware version on 2 units shipped in October. Units returned for re-flash at company cost.' },
+  { id:3,  no:'CAR-2025-003', submitted:'2025-10-28', by:'C. Rowe',     type:'Corrective', source:'Management Review',        proc:'QP-04', pname:'Nonconformance & CA',     pri:'High',   status:'Assigned',     owner:'Jed Judd',  assigned:'2025-10-29', due:'2026-01-10', closed:null,         daysClose:null,result:'Pending', followUp:false, rca:false, ca:false, desc:'Q3 Management Review: 4 of 6 open CARs had no root cause documented after 30+ days — QP-04 Section 6.3 not being followed.' },
+  { id:4,  no:'CAR-2025-004', submitted:'2025-11-05', by:'B. Wright',   type:'Preventive', source:'Internal Audit',          proc:'QP-07', pname:'Supplier Management',     pri:'Medium', status:'In Progress',  owner:'M. Torres', assigned:'2025-11-06', due:'2026-01-20', closed:null,         daysClose:null,result:'Pending', followUp:false, rca:false, ca:true,  desc:'Supplier qualification records incomplete for 2 of 8 critical suppliers. Risk of non-compliant parts entering production.' },
+  { id:5,  no:'CAR-2025-005', submitted:'2025-11-19', by:'S. Kim',      type:'Corrective', source:'Employee Feedback',       proc:'QP-06', pname:'Training & Competency',   pri:'High',   status:'Under Review', owner:'D. Thomas', assigned:'2025-11-20', due:'2026-02-05', closed:null,         daysClose:null,result:'Pending', followUp:true,  rca:true,  ca:true,  desc:'Two field techs performed service work outside their qualified scope. Scope certifications expired Q2 2025 with no renewal.' },
+  { id:6,  no:'CAR-2025-006', submitted:'2025-12-02', by:'Jed Judd',    type:'Corrective', source:'External Audit',          proc:'QP-01', pname:'Documentation Control',   pri:'High',   status:'Assigned',     owner:'R. Patel',  assigned:'2025-12-03', due:'2026-02-14', closed:null,         daysClose:null,result:'Pending', followUp:false, rca:false, ca:true,  desc:'ISO 9001 external audit found 3 controlled procedures with revision dates older than the master. Inconsistent document numbering.' },
+  { id:7,  no:'CAR-2025-007', submitted:'2025-12-15', by:'M. Torres',   type:'Corrective', source:'Supplier or Subcontractor',proc:'QP-07', pname:'Supplier Management',    pri:'Medium', status:'In Progress',  owner:'B. Wright', assigned:'2025-12-16', due:'2026-02-28', closed:null,         daysClose:null,result:'Pending', followUp:false, rca:true,  ca:true,  desc:'Subcontractor delivered 15 units with wrong torque spec on fastener assembly. 8 units shipped to customer before QA detection.' },
+  { id:8,  no:'CAR-2026-001', submitted:'2026-01-08', by:'D. Thomas',   type:'Preventive', source:'Management Review',       proc:'QP-05', pname:'Risk Management',         pri:'Medium', status:'Assigned',     owner:'Jed Judd',  assigned:'2026-01-09', due:'2026-03-07', closed:null,         daysClose:null,result:'Pending', followUp:false, rca:false, ca:false, desc:'Q4 Management Review: risk register not updated since Q1 2025. Six new product lines lack risk assessment.' },
+  { id:9,  no:'CAR-2026-002', submitted:'2026-01-22', by:'C. Rowe',     type:'Corrective', source:'Customer Feedback',       proc:'QP-11', pname:'Requirements Mgmt',       pri:'High',   status:'In Progress',  owner:'D. Thomas', assigned:'2026-01-23', due:'2026-03-15', closed:null,         daysClose:null,result:'Pending', followUp:false, rca:false, ca:true,  desc:'Customer escalated: delivered system does not meet interface spec in SOW Section 4.3. Change was missed during design review.' },
+  { id:10, no:'CAR-2026-003', submitted:'2026-02-10', by:'B. Wright',   type:'Corrective', source:'Internal Audit',          proc:'QP-12', pname:'Change Management',       pri:'Medium', status:'Assigned',     owner:'M. Torres', assigned:'2026-02-11', due:'2026-03-20', closed:null,         daysClose:null,result:'Pending', followUp:false, rca:false, ca:true,  desc:'Q4 internal audit: 4 engineering changes implemented without completed Change Request form. No QA sign-off on record.' },
+  { id:11, no:'CAR-2026-004', submitted:'2026-03-18', by:'S. Kim',      type:'OFI',        source:'Employee Feedback',       proc:'QP-03', pname:'Management Review',       pri:'Low',    status:'New',          owner:null,        assigned:null,         due:null,         closed:null,         daysClose:null,result:null,     followUp:false, rca:false, ca:false, desc:'OFI: add a 15-min QMS health check to the monthly all-hands meeting to improve staff awareness of open CARs and KPIs.' },
+];
+
+/* 12-month submission trend Apr 2025 – Mar 2026 */
+const TREND = [
+  { m:'Apr', C:2, P:1, O:0 }, { m:'May', C:1, P:0, O:1 },
+  { m:'Jun', C:3, P:1, O:0 }, { m:'Jul', C:1, P:0, O:0 },
+  { m:'Aug', C:2, P:1, O:1 }, { m:'Sep', C:1, P:0, O:0 },
+  { m:'Oct', C:3, P:0, O:0 }, { m:'Nov', C:2, P:1, O:0 },
+  { m:'Dec', C:2, P:0, O:1 }, { m:'Jan', C:1, P:1, O:0 },
+  { m:'Feb', C:2, P:0, O:0 }, { m:'Mar', C:2, P:0, O:1 },
+];
+
+/* ── helpers ────────────────────────────────────────────────── */
+const daysOD  = d => d ? Math.max(0, Math.floor((TODAY - new Date(d)) / 86400000)) : 0;
+const isOD    = c => !!c.due && c.status !== 'Closed' && c.status !== 'Cancelled' && new Date(c.due) < TODAY;
+const fmtD    = d => d ? new Date(d).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '—';
+const fmtDs   = d => d ? new Date(d).toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '—';
+// Strip HTML tags from rich-text fields for plain-text display contexts
+const stripHtml = html => {
+  if (!html) return '';
+  return html
+    .replace(/<br\s*\/?>/gi, '\n')          // <br> → newline
+    .replace(/<\/p>|<\/div>/gi, '\n')      // block ends → newline
+    .replace(/<[^>]*>/g, '')                  // strip remaining tags
+    .replace(/&amp;/gi,'&').replace(/&lt;/gi,'<').replace(/&gt;/gi,'>').replace(/&nbsp;/gi,' ')
+    .replace(/&[a-z#0-9]+;/gi, ' ')           // other entities → space
+    .replace(/[^\S\n]+/g, ' ')              // collapse spaces/tabs (but NOT \n)
+    .replace(/\n{3,}/g, '\n\n')             // max two consecutive newlines
+    .trim();
+};
+
+/* ── badge helpers ──────────────────────────────────────────── */
+function SBadge({s}){
+  const m={New:'s-new',Assigned:'s-asgn','In Progress':'s-prog','Under Review':'s-rev',Closed:'s-clsd',Cancelled:'s-canc'};
+  return <span className={`bdg ${m[s]||'s-new'}`}>{s}</span>;
+}
+function TBadge({t}){
+  const m={Corrective:'t-corr',Preventive:'t-prev',OFI:'t-ofi'};
+  return <span className={`bdg ${m[t]||'t-corr'}`}>{t}</span>;
+}
+function PBadge({p}){
+  const m={High:'p-hi',Medium:'p-med',Low:'p-lo'};
+  return <span className={`bdg ${m[p]||'p-lo'}`}>{p}</span>;
+}
+
+/* ── Chart.js wrappers ──────────────────────────────────────── */
+function TrendChart({ trendData }) {
+  const ref = useRef(null);
+  const inst = useRef(null);
+  useEffect(() => {
+    if (!ref.current) return;
+    if (inst.current) inst.current.destroy();
+    inst.current = new Chart(ref.current, {
+      type: 'bar',
+      data: {
+        labels: trendData.map(d => d.m),
+        datasets: [
+          { label:'Corrective', data: trendData.map(d=>d.C), backgroundColor:'#2563eb', stack:'s' },
+          { label:'Preventive', data: trendData.map(d=>d.P), backgroundColor:'#7c3aed', stack:'s' },
+          { label:'OFI',        data: trendData.map(d=>d.O), backgroundColor:'#0891b2', stack:'s' },
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { position:'bottom', labels:{ font:{size:11}, boxWidth:12, padding:10 } } },
+        scales: {
+          x: { stacked:true, grid:{ display:false }, ticks:{ font:{size:11} } },
+          y: { stacked:true, grid:{ color:'#f1f5f9' }, ticks:{ font:{size:11}, stepSize:1 } }
+        }
+      }
+    });
+    return () => inst.current && inst.current.destroy();
+  }, [trendData]);
+  return <div className="chart-wrap" style={{height:200}}><canvas ref={ref}/></div>;
+}
+
+function ProcessChart({ cars }) {
+  const ref  = useRef(null);
+  const inst = useRef(null);
+  useEffect(() => {
+    const openCARs = cars.filter(c => c.status !== 'Closed' && c.status !== 'Cancelled');
+    const byProc = {};
+    openCARs.forEach(c => { byProc[c.proc] = (byProc[c.proc]||0) + 1; });
+    const sorted = Object.entries(byProc).sort((a,b)=>b[1]-a[1]);
+    if (inst.current) inst.current.destroy();
+    inst.current = new Chart(ref.current, {
+      type: 'bar',
+      data: {
+        labels: sorted.map(d=>d[0]),
+        datasets: [{ data: sorted.map(d=>d[1]), backgroundColor:'#2563eb', borderRadius:3 }]
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend:{ display:false }, tooltip:{ callbacks:{ label: ctx => ` ${ctx.raw} open CAR${ctx.raw!==1?'s':''}` } } },
+        scales: {
+          x: { grid:{ color:'#f1f5f9' }, ticks:{ font:{size:11}, stepSize:1 } },
+          y: { grid:{ display:false }, ticks:{ font:{size:11} } }
+        }
+      }
+    });
+    return () => inst.current && inst.current.destroy();
+  }, [cars]);
+  return <div className="chart-wrap" style={{height:200}}><canvas ref={ref}/></div>;
+}
+
+function SourceChart({ cars }) {
+  const ref  = useRef(null);
+  const inst = useRef(null);
+  useEffect(() => {
+    const bySrc = {};
+    cars.forEach(c => { bySrc[c.source] = (bySrc[c.source]||0) + 1; });
+    const labels = Object.keys(bySrc);
+    const data   = Object.values(bySrc);
+    const COLS = ['#2563eb','#7c3aed','#0891b2','#059669','#d97706','#dc2626'];
+    if (inst.current) inst.current.destroy();
+    inst.current = new Chart(ref.current, {
+      type: 'doughnut',
+      data: {
+        labels,
+        datasets: [{ data, backgroundColor: COLS.slice(0,labels.length), hoverOffset:4 }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        cutout: '60%',
+        plugins: {
+          legend: { position:'bottom', labels:{ font:{size:10}, boxWidth:10, padding:7,
+            generateLabels: chart => chart.data.labels.map((l,i) => ({
+              text: l.replace(' or Subcontractor','').replace(' Feedback','').replace('Management ','Mgmt '),
+              fillStyle: COLS[i], strokeStyle: COLS[i], lineWidth:0, index:i
+            }))
+          }},
+          tooltip: { callbacks:{ label: ctx => ` ${ctx.label}: ${ctx.raw}` } }
+        }
+      }
+    });
+    return () => inst.current && inst.current.destroy();
+  }, [cars]);
+  return <div className="chart-wrap" style={{height:200}}><canvas ref={ref}/></div>;
+}
+
+/* ── KPI Card ────────────────────────────────────────────────── */
+function KPI({ lbl, val, sub, color, ico, tgt, met }) {
+  return (
+    <div className={`kpi c-${color}`}>
+      <div className="kpi-ico">{ico}</div>
+      <div className="kpi-lbl">{lbl}</div>
+      <div className={`kpi-val c-${color}`}>{val}</div>
+      <div className="kpi-sub">{sub}</div>
+      {tgt && <div className={`kpi-tgt ${met?'ok':'fail'}`}>{met?'✓ Target met':'✗ Below target'} — {tgt}</div>}
+    </div>
+  );
+}
+
+/* ── Dashboard ───────────────────────────────────────────────── */
+function Dashboard({ cars, liveMode, fetchedAt, onSelect, onSubmitCar }) {
+  const open     = cars.filter(c => c.status !== 'Closed' && c.status !== 'Cancelled');
+  const overdue  = cars.filter(isOD).sort((a,b) => daysOD(b.due) - daysOD(a.due));
+
+
+  const closedMo = cars.filter(c => { if(!c.closed) return false; const d=new Date(c.closed); return d.getFullYear()===2026 && d.getMonth()===2; });
+  const closedAll= cars.filter(c => c.status === 'Closed');
+  const onTimeN  = closedAll.filter(c => c.due && c.closed && new Date(c.closed)<=new Date(c.due)).length;
+  const onTimePct= closedAll.length ? Math.round(onTimeN/closedAll.length*100) : null;
+  const odRate   = open.length ? Math.round(overdue.length/open.length*100) : 0;
+
+  // Build 12-month submission trend dynamically from live cars
+  const trendData = (() => {
+    const months = [];
+    const now = TODAY;
+    for (let i = 11; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      months.push({ y: d.getFullYear(), mo: d.getMonth(),
+                    m: d.toLocaleDateString('en-US',{month:'short'}), C:0, P:0, O:0 });
+    }
+    cars.forEach(c => {
+      if (!c.submitted) return;
+      const sd = new Date(c.submitted);
+      const slot = months.find(m => m.y===sd.getFullYear() && m.mo===sd.getMonth());
+      if (!slot) return;
+      if (c.type==='Corrective') slot.C++;
+      else if (c.type==='Preventive') slot.P++;
+      else slot.O++;
+    });
+    return months;
+  })();
+
+  return (
+    <div>
+      {liveMode
+        ? <div className="banner" style={{background:'#dcfce7',borderColor:'#16a34a',color:'#14532d'}}>
+            ✅ <span><strong>Live — SharePoint.</strong> {cars.length} CARs loaded from the SharePoint CAR Log.{fetchedAt ? ` Last synced: ${new Date(fetchedAt).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}.` : ''} Live read/write active — Phase 3: Full workflow editing.</span>
+          </div>
+        : <div className="banner">
+            🔧 <span><strong>Phase 1 — Prototype.</strong> Sample data mirrors your live CAR Log (11 CARs · 9 overdue · 1 closed). Live SharePoint connection coming in Phase 2.</span>
+          </div>
+      }
+
+      {/* KPIs */}
+      <div className="slabel">QMS Health Overview</div>
+      <div className="kpi-grid">
+        <KPI lbl="Open CARs"         val={open.length}
+          sub="Active corrective actions" color="blue" ico="📋"
+          tgt="< 10 open"  met={open.length < 10} />
+        <KPI lbl="Overdue"           val={overdue.length}
+          sub={`${odRate}% of open CARs`} color="red" ico="⚠️"
+          tgt="< 10% overdue rate"   met={odRate < 10} />
+        <KPI lbl="Closed This Month" val={closedMo.length}
+          sub="March 2026" color="green" ico="✅" />
+        <KPI lbl="On-Time Closure Rate" val={onTimePct !== null ? `${onTimePct}%` : '—'}
+          sub={`Based on ${closedAll.length} closed CAR${closedAll.length!==1?'s':''}`}
+          color="amber" ico="📈" tgt="≥ 85%"
+          met={onTimePct !== null && onTimePct >= 85} />
+      </div>
+
+      {/* Charts */}
+      <div className="slabel">Trend Analysis</div>
+      <div className="chart-grid">
+        <div className="chart-card">
+          <div className="chart-title">CARs Submitted — Last 12 Months</div>
+          <div className="chart-sub">Stacked by type · last 12 months</div>
+          <TrendChart trendData={trendData} />
+        </div>
+        <div className="chart-card">
+          <div className="chart-title">Open CARs by Process</div>
+          <div className="chart-sub">Current open items only</div>
+          <ProcessChart cars={cars} />
+        </div>
+        <div className="chart-card">
+          <div className="chart-title">All CARs by Source</div>
+          <div className="chart-sub">ISO 9001 § 10.2 input analysis</div>
+          <SourceChart cars={cars} />
+        </div>
+      </div>
+
+      {/* Tables */}
+      <div className="slabel">Active CARs</div>
+      <div className="tbl-grid">
+        {/* Open CARs */}
+        <div className="tbl-card">
+          <div className="tbl-hdr">
+            <span className="tbl-title">Open CARs</span>
+            <span className="tbl-count">{open.length} open</span>
+          </div>
+          <div className="scroll-x">
+            <table>
+              <thead><tr>
+                <th>CAR #</th><th>Summary</th><th>Assigned To</th>
+                <th>Due Date</th><th>Pri</th><th>Status</th>
+              </tr></thead>
+              <tbody>
+                {open.map(c => {
+                  const od = isOD(c);
+                  const summary = c.brief || c.desc || '';
+                  return (
+                    <tr key={c.id} className={od?'od-row':''} style={{cursor:'pointer'}} onClick={()=>onSelect&&onSelect(c.id)}>
+                      <td style={{fontWeight:600,color:'#2563eb',whiteSpace:'nowrap',textDecoration:'underline'}}>{c.no}</td>
+                      <td style={{fontSize:12,maxWidth:180,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}} title={stripHtml(c.desc) || c.brief || ''}>{c.brief || <span style={{color:'#94a3b8'}}>—</span>}</td>
+                      <td>{c.owner || <span style={{color:'#94a3b8'}}>Unassigned</span>}</td>
+                      <td style={{whiteSpace:'nowrap'}}>
+                        {c.due
+                          ? <span style={od?{color:'#dc2626',fontWeight:600}:{}}>{fmtDs(c.due)}{od && <span className="od-pill" style={{marginLeft:5}}>+{daysOD(c.due)}d</span>}</span>
+                          : <span style={{color:'#94a3b8'}}>—</span>}
+                      </td>
+                      <td><PBadge p={c.pri} /></td>
+                      <td><SBadge s={c.status} /></td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Overdue */}
+        <div className="tbl-card">
+          <div className="tbl-hdr">
+            <span className="tbl-title" style={{color:'#dc2626'}}>⚠ Overdue CARs</span>
+            <span className="tbl-count danger">{overdue.length} overdue</span>
+          </div>
+          <div className="scroll-x">
+            <table>
+              <thead><tr>
+                <th>CAR #</th><th>Summary</th><th>Assigned To</th>
+                <th>Due Date</th><th>Days Over</th><th>Pri</th><th>Status</th>
+              </tr></thead>
+              <tbody>
+                {overdue.map(c => (
+                  <tr key={c.id} className="od-row" style={{cursor:'pointer'}} onClick={()=>onSelect&&onSelect(c.id)}>
+                    <td style={{fontWeight:600,color:'#dc2626',whiteSpace:'nowrap',textDecoration:'underline'}}>{c.no}</td>
+                    <td style={{fontSize:12,maxWidth:160,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}} title={stripHtml(c.desc) || c.brief || ''}>{c.brief||c.desc||<span style={{color:'#94a3b8'}}>—</span>}</td>
+                    <td>{c.owner || <span style={{color:'#94a3b8'}}>Unassigned</span>}</td>
+                    <td style={{color:'#dc2626',whiteSpace:'nowrap'}}>{fmtD(c.due)}</td>
+                    <td><span className="od-pill">+{daysOD(c.due)}d</span></td>
+                    <td><PBadge p={c.pri} /></td>
+                    <td><SBadge s={c.status} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      {/* Submit CTA */}
+      <div className="slabel">Staff Entry Point</div>
+      <div className="cta">
+        <div>
+          <h3>Submit a Corrective Action Request</h3>
+          <p>Any staff member can report a nonconformance or improvement opportunity. The 6-question form takes under 2 minutes.</p>
+        </div>
+        <button className="cta-btn" onClick={onSubmitCar}>
+          + Submit a CAR
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ── CAR Log ─────────────────────────────────────────────────── */
+function CARLog({ cars, liveMode, onSelect }) {
+  const [filter, setFilter] = useState('All');
+  const opts = ['All','New','Assigned','In Progress','Under Review','Closed','Overdue'];
+  const rows = filter==='All'     ? cars
+             : filter==='Overdue' ? cars.filter(isOD)
+             : cars.filter(c=>c.status===filter);
+
+  return (
+    <div>
+      <div className="banner" style={liveMode ? {background:'#dcfce7',borderColor:'#16a34a',color:'#14532d'} : {}}>
+        {liveMode
+          ? <span>✅ <strong>Live — SharePoint CAR Log.</strong> Showing {cars.length} CARs. Click any row to open details and edit.</span>
+          : <span>🔧 <strong>Phase 1 — Prototype.</strong> Read-only sample data. Click any row to view CAR details.</span>
+        }
+      </div>
+      <div className="log-card">
+        <div className="log-hdr">
+          <div>
+            <div style={{fontSize:14,fontWeight:600,color:'var(--g700)'}}>CAR Log — All Records</div>
+            <div style={{fontSize:12,color:'var(--g500)',marginTop:2}}>{rows.length} of {cars.length} CARs shown</div>
+          </div>
+          <div className="pills">
+            {opts.map(o => (
+              <button key={o} className={`pill ${filter===o?'on':''}`} onClick={()=>setFilter(o)}>
+                {o}{o==='All'?` (${cars.length})`:''}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="scroll-x">
+          <table>
+            <thead><tr>
+              <th>CAR #</th>
+              <th>Summary / Description</th>
+              <th>Process</th>
+              <th>Status</th><th>Assigned To</th>
+              <th>Due Date</th><th>Schedule</th>
+              <th>Date</th><th>Type</th><th>Source</th><th>Pri</th>
+            </tr></thead>
+            <tbody>
+              {rows.map(c => {
+                const od = isOD(c);
+                const summary = c.brief || c.desc || '';
+                return (
+                  <tr key={c.id} className={od?'od-row':''} style={{cursor:'pointer'}} onClick={()=>onSelect&&onSelect(c.id)}>
+                    <td style={{fontWeight:600,color:'#2563eb',whiteSpace:'nowrap',textDecoration:'underline'}}>{c.no}</td>
+                    <td style={{fontSize:12,maxWidth:260,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}} title={stripHtml(c.desc)||c.brief}>{c.brief||<span style={{color:'#94a3b8'}}>—</span>}</td>
+                    <td style={{fontSize:12,whiteSpace:'nowrap',verticalAlign:'top'}}>{c.proc} {c.pname}</td>
+                    <td><SBadge s={c.status}/></td>
+                    <td style={{whiteSpace:'nowrap',fontSize:12}}>{c.owner||<span style={{color:'#94a3b8'}}>—</span>}</td>
+                    <td style={{whiteSpace:'nowrap',fontSize:12}}>
+                      {c.due ? <span style={od?{color:'#dc2626',fontWeight:600}:{}}>{fmtDs(c.due)}</span> : <span style={{color:'#94a3b8'}}>—</span>}
+                    </td>
+                    <td>
+                      {od ? <span className="od-pill">+{daysOD(c.due)}d</span>
+                          : c.status==='Closed' ? <span style={{color:'#16a34a',fontSize:12,fontWeight:600}}>✓</span>
+                          : <span style={{color:'#94a3b8'}}>—</span>}
+                    </td>
+                    <td style={{whiteSpace:'nowrap',fontSize:12}}>{fmtD(c.submitted)}</td>
+                    <td><TBadge t={c.type}/></td>
+                    <td style={{fontSize:11.5,maxWidth:100,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{c.source}</td>
+                    <td><PBadge p={c.pri}/></td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════
+   PHASE 3 — CAR DETAIL DRAWER
+   ══════════════════════════════════════════════════════════════ */
+const STATUS_OPTS = ['New','Assigned','In Progress','Under Review','Closed','Cancelled'];
+const TYPE_OPTS   = ['Corrective','Preventive','OFI'];
+const PRI_OPTS    = ['Low','Medium','High','Critical'];
+const RESULT_OPTS  = ['','Pass','Fail','Pending','N/A'];
+const SOURCE_OPTS  = ['Internal Audit','External Audit','Customer Feedback',
+  'Employee Feedback','Management Review','Supplier or Subcontractor',
+  'Product/Service Testing','Process Review'];
+
+const dbtn = color => {
+  const m = { blue:{background:'#2563eb',color:'#fff',border:'none'}, green:{background:'#16a34a',color:'#fff',border:'none'}, gray:{background:'#f1f5f9',color:'#475569',border:'1px solid #e2e8f0'} };
+  return {...(m[color]||m.gray), padding:'7px 14px', borderRadius:6, fontSize:13, fontWeight:500, cursor:'pointer'};
+};
+
+function DrSection({ title, children }) {
+  return (
+    <div style={{marginBottom:22}}>
+      <div style={{fontSize:10.5,fontWeight:700,color:'#94a3b8',textTransform:'uppercase',letterSpacing:'0.1em',marginBottom:10,paddingBottom:6,borderBottom:'1px solid #f1f5f9'}}>{title}</div>
+      <div style={{display:'grid',gap:10}}>{children}</div>
+    </div>
+  );
+}
+function DrField({ label, value, multiline, html }) {
+  const empty = value === null || value === undefined || value === '';
+  const textStyle = {fontSize:12,color:'#1e293b',lineHeight:multiline?1.55:1.4,whiteSpace:multiline?'pre-wrap':'normal'};
+  return (
+    <div style={{display:'grid',gridTemplateColumns:'130px 1fr',gap:8,alignItems:'start'}}>
+      <span style={{fontSize:12,color:'#94a3b8',paddingTop:2,flexShrink:0}}>{label}</span>
+      {empty ? <span style={{fontSize:12,color:'#cbd5e1'}}>—</span>
+             : html
+               ? <div style={{...textStyle,whiteSpace:'normal'}} dangerouslySetInnerHTML={{__html: value}} />
+               : <span style={textStyle}>{value}</span>}
+    </div>
+  );
+}
+function DrSelect({ label, value, options, editing, onChange }) {
+  if (!editing) return <DrField label={label} value={value} />;
+  return (
+    <div style={{display:'grid',gridTemplateColumns:'130px 1fr',gap:8,alignItems:'center'}}>
+      <span style={{fontSize:12,color:'#64748b'}}>{label}</span>
+      <select value={value||''} onChange={e=>onChange(e.target.value)}
+        style={{fontSize:12,padding:'5px 8px',border:'1px solid #cbd5e1',borderRadius:5,background:'#fff',color:'#1e293b'}}>
+        {options.map(o=><option key={o} value={o}>{o}</option>)}
+      </select>
+    </div>
+  );
+}
+function DrText({ label, value, editing, onChange, multiline }) {
+  if (!editing) return <DrField label={label} value={value} multiline={multiline} />;
+  const style = {fontSize:12,padding:'5px 8px',border:'1px solid #cbd5e1',borderRadius:5,background:'#fff',color:'#1e293b',width:'100%'};
+  return (
+    <div style={{display:'grid',gridTemplateColumns:'130px 1fr',gap:8,alignItems:'start'}}>
+      <span style={{fontSize:12,color:'#64748b',paddingTop:multiline?6:0}}>{label}</span>
+      {multiline
+        ? <textarea value={value||''} onChange={e=>onChange(e.target.value)} rows={3}
+            style={{...style,resize:'vertical',lineHeight:1.4}} />
+        : <input type="text" value={value||''} onChange={e=>onChange(e.target.value)}
+            style={style} />}
+    </div>
+  );
+}
+
+function DrDate({ label, value, editing, onChange }) {
+  // Normalize any date format (ISO or locale) to YYYY-MM-DD for the date input
+  const toIso = v => {
+    if (!v) return '';
+    const s = String(v);
+    if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.split('T')[0];   // already ISO
+    const d = new Date(s);
+    return isNaN(d) ? '' : d.toISOString().split('T')[0];         // locale → ISO
+  };
+  const iso = toIso(value);
+  if (!editing) return <DrField label={label} value={fmtD(value)} />;
+  return (
+    <div style={{display:'grid',gridTemplateColumns:'130px 1fr',gap:8,alignItems:'center'}}>
+      <span style={{fontSize:12,color:'#64748b'}}>{label}</span>
+      <input type="date" value={iso} onChange={e=>onChange(e.target.value)}
+        style={{fontSize:12,padding:'5px 8px',border:'1px solid #cbd5e1',borderRadius:5,background:'#fff',color:'#1e293b',width:'100%'}} />
+    </div>
+  );
+}
+function DrCheckbox({ label, value, editing, onChange }) {
+  if (!editing) return <DrField label={label} value={value ? '⚠️ Yes — follow-up needed' : 'No'} />;
+  return (
+    <div style={{display:'grid',gridTemplateColumns:'130px 1fr',gap:8,alignItems:'center'}}>
+      <span style={{fontSize:12,color:'#64748b'}}>{label}</span>
+      <label style={{display:'flex',alignItems:'center',gap:6,cursor:'pointer',userSelect:'none'}}>
+        <input type="checkbox" checked={!!value} onChange={e=>onChange(e.target.checked)}
+          style={{width:14,height:14,cursor:'pointer',accentColor:'#2563eb'}} />
+        <span style={{fontSize:12,color:'#1e293b'}}>{value ? 'Yes' : 'No'}</span>
+      </label>
+    </div>
+  );
+}
+function DrAssignee({ label, value, users, editing, onChange }) {
+  if (!editing) return <DrField label={label} value={value} />;
+  return (
+    <div style={{display:'grid',gridTemplateColumns:'130px 1fr',gap:8,alignItems:'center'}}>
+      <span style={{fontSize:12,color:'#64748b'}}>{label}</span>
+      <select onChange={e=>onChange(e.target.value ? parseInt(e.target.value) : null)} defaultValue=""
+        style={{fontSize:12,padding:'5px 8px',border:'1px solid #cbd5e1',borderRadius:5,background:'#fff',color:'#1e293b'}}>
+        <option value="">{value ? `${value} (current)` : 'Unassigned'}</option>
+        <option disabled>──────────</option>
+        {users.map(u=><option key={u.id} value={u.id}>{u.name}</option>)}
+      </select>
+    </div>
+  );
+}
+
+
+/* ── Workflow Action Bar ────────────────────────────────────────────────────
+   Contextual one-click stage transitions shown above the scrollable body.  */
+function WorkflowActions({ car, liveMode, users, onQuickSave }) {
+  const [expanding,    setExpanding]   = useState(false);
+  const [assigneeId,   setAssigneeId]  = useState('');
+  const [dueDate,      setDueDate]     = useState('');
+  const [closeResult,  setCloseResult] = useState('');
+  const [working,      setWorking]     = useState(false);
+  const [err,          setErr]         = useState(null);
+
+  if (!liveMode) return null;
+
+  const today = () => new Date().toISOString().split('T')[0];
+
+  const act = async (fields) => {
+    setWorking(true); setErr(null);
+    try { await onQuickSave(fields); setExpanding(false); }
+    catch(e) { setErr(e.message || 'Save failed'); }
+    finally { setWorking(false); }
+  };
+
+  const bar  = { padding:'10px 20px', borderBottom:'1px solid #e2e8f0',
+                 background:'#f8fafc', display:'flex', alignItems:'center',
+                 gap:10, flexShrink:0, flexWrap:'wrap' };
+  const note = { fontSize:12, color:'#64748b', flex:1 };
+  const btn  = (c) => {
+    const map = { blue:'#2563eb', green:'#16a34a', amber:'#d97706', gray:'#64748b', red:'#dc2626' };
+    return { fontSize:12, fontWeight:600, padding:'6px 14px', borderRadius:6,
+             border:'none', cursor: working ? 'wait' : 'pointer',
+             background: map[c]||map.blue, color:'#fff',
+             opacity: working ? 0.6 : 1 };
+  };
+  const inp = { fontSize:12, padding:'5px 8px', border:'1px solid #cbd5e1',
+                borderRadius:6, color:'#1e293b', background:'#fff' };
+
+  const s = car.status;
+
+  /* ── New ── */
+  if (s === 'New') {
+    if (!expanding) return (
+      <div style={bar}>
+        <span style={note}>Awaiting assignment to a process owner.</span>
+        <button style={btn('blue')} onClick={()=>setExpanding(true)}>Assign CAR →</button>
+      </div>
+    );
+    return (
+      <div style={{...bar, background:'#eff6ff', borderColor:'#bfdbfe'}}>
+        <span style={{fontSize:12,fontWeight:600,color:'#1d4ed8',marginRight:4}}>Assign to:</span>
+        <select value={assigneeId} onChange={e=>setAssigneeId(e.target.value)} style={{...inp,minWidth:180}}>
+          <option value="">— select owner —</option>
+          {(users||[]).map(u=><option key={u.id} value={u.id}>{u.name}</option>)}
+        </select>
+        <span style={{fontSize:12,fontWeight:600,color:'#1d4ed8',marginLeft:6}}>Due:</span>
+        <input type="date" value={dueDate} onChange={e=>setDueDate(e.target.value)} style={inp} />
+        <button style={btn('blue')}
+          disabled={!assigneeId || !dueDate || working}
+          onClick={()=>act({status:'Assigned', assignedToId: Number(assigneeId), dueDate})}>
+          {working ? '⏳' : '✓ Assign'}
+        </button>
+        <button style={btn('gray')} onClick={()=>setExpanding(false)} disabled={working}>Cancel</button>
+        {err && <span style={{fontSize:11,color:'#dc2626'}}>❌ {err}</span>}
+      </div>
+    );
+  }
+
+  /* ── Assigned ── */
+  if (s === 'Assigned') return (
+    <div style={bar}>
+      <span style={note}>Assigned — waiting for process owner to begin root cause analysis.</span>
+      <button style={btn('blue')} disabled={working}
+        onClick={()=>act({status:'In Progress'})}>
+        {working ? '⏳' : 'Start Work →'}
+      </button>
+    </div>
+  );
+
+  /* ── In Progress ── */
+  if (s === 'In Progress') {
+    const hasRCA = !!(car.rootCause && car.rootCause.trim()
+                   && car.actionPlan && car.actionPlan.trim());
+    return (
+      <div style={bar}>
+        {!hasRCA
+          ? <span style={{...note, color:'#d97706'}}>
+              ⚠ Complete Root Cause and Action Plan before submitting for verification.
+            </span>
+          : <span style={{...note, color:'#16a34a'}}>Root cause and action plan complete — ready for verification.</span>
+        }
+        <button style={btn(hasRCA ? 'blue' : 'gray')}
+          disabled={!hasRCA || working}
+          onClick={()=>act({status:'Under Review', dateActionCompleted: today()})}>
+          {working ? '⏳' : 'Submit for Verification →'}
+        </button>
+      </div>
+    );
+  }
+
+  /* ── Under Review ── */
+  if (s === 'Under Review') return (
+    <div style={bar}>
+      <span style={note}>Verify root cause eliminated and action complete.</span>
+      <span style={{fontSize:12,fontWeight:600,color:'#1d4ed8'}}>Result:</span>
+      <select value={closeResult} onChange={e=>setCloseResult(e.target.value)}
+        style={{...inp, minWidth:100, borderColor: closeResult ? '#cbd5e1' : '#fca5a5'}}>
+        <option value=''>— select —</option>
+        <option value='Pass'>Pass</option>
+        <option value='Fail'>Fail</option>
+      </select>
+      <button style={btn(closeResult ? 'green' : 'gray')}
+        disabled={!closeResult || working}
+        title={!closeResult ? 'Select a result before closing' : ''}
+        onClick={()=>act({status:'Closed', result:closeResult, dateClosed: today()})}>
+        {working ? '⏳' : '✓ Close CAR'}
+      </button>
+      <button style={btn('amber')} disabled={working}
+        onClick={()=>act({status:'In Progress', result:'', dateClosed:''})}>
+        {working ? '⏳' : '↩ Re-open — More Work Needed'}
+      </button>
+    </div>
+  );
+
+  /* ── Closed / Cancelled ── */
+  if (s === 'Closed' || s === 'Cancelled') return (
+    <div style={{...bar, background:'#f0fdf4', borderColor:'#bbf7d0'}}>
+      <span style={{...note, color:'#16a34a'}}>
+        {s === 'Closed' ? '✅ CAR is closed.' : '🚫 CAR is cancelled.'}
+      </span>
+      <button style={btn('amber')} disabled={working}
+        onClick={()=>act({status:'In Progress', result:'', dateClosed:''})}>
+        {working ? '⏳' : '↩ Re-open'}
+      </button>
+    </div>
+  );
+
+  return null;
+}
+
+function CARDrawer({ car, liveMode, onClose, onSave, carList, currentIdx, onNavigate, userMap = {} }) {
+  const [editing, setEditing] = useState(false);
+  const [saving,  setSaving]  = useState(false);
+  const [saveErr, setSaveErr] = useState(null);
+  const [savedOk, setSavedOk] = useState(false);
+  const [draft,   setDraft]   = useState({});
+  const [users,   setUsers]   = useState([]);
+  // optimisticStatus: set immediately after save so the stage bar and
+  // WorkflowActions reflect the new stage without waiting for the server refresh.
+  const [optimisticStatus, setOptimisticStatus] = useState(null);
+
+  // Load users on mount (needed for Assign action bar as well as edit mode)
+  useEffect(() => {
+    if (!users.length) {
+      fetch('/api/users').then(r=>r.json()).then(d=>setUsers(d.users||[])).catch(()=>{});
+    }
+  }, []);
+
+  // Reset edit state when a different CAR is selected
+  useEffect(() => { setEditing(false); setSaveErr(null); setSavedOk(false); setOptimisticStatus(null); }, [car && car.id]);
+
+  if (!car) return null;
+  const displayStatus = (optimisticStatus && optimisticStatus !== car.status)
+    ? optimisticStatus : car.status;
+  const od = isOD(car);
+
+  // Prev/Next navigation
+  const hasPrev = currentIdx > 0;
+  const hasNext = currentIdx < (carList || []).length - 1;
+  const navTo = dir => {
+    if (editing) {
+      if (!window.confirm('You have unsaved changes. Leave anyway?')) return;
+      setEditing(false);
+    }
+    const newCar = (carList || [])[currentIdx + dir];
+    if (newCar) onNavigate(newCar.id);
+  };
+
+  const startEdit = () => {
+    const _fullProc = car.proc ? car.proc + (car.pname ? ' ' + car.pname : '') : (car.pname || '');
+    setDraft({
+      status:    car.status,   carType:  car.type,    priority: car.pri,
+      process:   _fullProc,
+      dueDate:   car.due    ? String(car.due).substring(0,10)    : '',
+      brief:     car.brief  || '',
+      notes:     car.notes  || '',
+      followUp:             !!car.followUp,
+      containment:          car.containment  || '',
+      rootCause:            car.rootCause    || '',
+      actionPlan:           car.actionPlan   || '',
+      dateActionCompleted:  car.dateActionCompleted
+                             ? String(car.dateActionCompleted).substring(0,10)
+                             : new Date().toISOString().split('T')[0],
+      result:               car.result       || '',
+      dateClosed:           car.closed       ? String(car.closed).substring(0,10) : '',
+    });
+    setEditing(true); setSaveErr(null); setSavedOk(false);
+  };
+  const cancelEdit = () => { setEditing(false); setSaveErr(null); };
+
+  const save = async () => {
+    setSaving(true); setSaveErr(null);
+    const fields = {};
+    if (draft.status   !== car.status)      fields.status       = draft.status;
+    if (draft.carType  !== car.type)        fields.carType      = draft.carType;
+    if (draft.priority !== car.pri)         fields.priority     = draft.priority;
+    // Normalize to YYYY-MM-DD before comparing (car.due may have T00:00:00Z suffix)
+    const _toDt = v => v ? String(v).substring(0,10) : '';
+    if (_toDt(draft.dueDate) !== _toDt(car.due||'')) fields.dueDate = draft.dueDate;
+    const _fp = car.proc ? car.proc + (car.pname ? ' ' + car.pname : '') : (car.pname || '');
+    if (draft.process !== undefined && draft.process !== _fp) fields.process = draft.process;
+    if (draft.brief         !== (car.brief||''))       fields.brief               = draft.brief;
+    if (draft.notes         !== (car.notes||''))       fields.notes               = draft.notes;
+    if (draft.followUp !== !!car.followUp)             fields.followUp            = draft.followUp;
+    if (draft.containment   !== (car.containment||'')) fields.containment         = draft.containment;
+    if (draft.rootCause     !== (car.rootCause||''))   fields.rootCause           = draft.rootCause;
+    if (draft.actionPlan    !== (car.actionPlan||''))  fields.actionPlan          = draft.actionPlan;
+    if (_toDt(draft.dateActionCompleted) !== _toDt(car.dateActionCompleted||''))
+      fields.dateActionCompleted = draft.dateActionCompleted;
+    if (draft.result !== (car.result||''))             fields.result              = draft.result;
+    if (_toDt(draft.dateClosed) !== _toDt(car.closed||''))
+      fields.dateClosed = draft.dateClosed;
+    if (draft.assignedToId !== undefined)              fields.assignedToId        = draft.assignedToId;
+    if (!Object.keys(fields).length) { cancelEdit(); setSaving(false); return; }
+    // Validate: cannot close without a passing result
+    const effStatus = fields.status !== undefined ? fields.status : car.status;
+    const effResult = fields.result !== undefined ? fields.result : (car.result || '');
+    if (effStatus === 'Closed' && !['Pass','N/A'].includes(effResult)) {
+      setSaveErr('Cannot set Status to Closed — Result must be "Pass" or "N/A" first.');
+      setSaving(false); return;
+    }
+    try {
+      const r = await fetch('/api/update', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ id: car.id, fields })
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || 'Save failed');
+      setSavedOk(true); setSaving(false);
+      if (fields.status) setOptimisticStatus(fields.status);
+      // Stay in edit mode — don't exit until user clicks Cancel
+      onSave();                                    // start refreshing immediately
+      setTimeout(() => setSavedOk(false), 4000);  // clear saved badge after 4s
+    } catch(e) { setSaveErr(e.message); setSaving(false); }
+  };
+
+  // quickSave — save a specific set of fields without entering edit mode
+  const quickSave = async (fields) => {
+    const r = await fetch('/api/update', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({id: car.id, fields}),
+    });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || 'Save failed');
+    setSavedOk(true);
+    if (fields.status) setOptimisticStatus(fields.status);  // instant stage update
+    setTimeout(() => setSavedOk(false), 3000);
+    onSave();
+  };
+
+  return (
+    <div style={{position:'fixed',inset:0,zIndex:200,display:'flex',alignItems:'stretch'}}>
+      {/* Backdrop */}
+      <div onClick={onClose} style={{flex:1,background:'rgba(15,23,42,0.45)',cursor:'pointer'}} />
+      {/* Panel */}
+      <div style={{width:500,background:'#fff',display:'flex',flexDirection:'column',boxShadow:'-6px 0 40px rgba(15,23,42,0.2)',overflowY:'hidden',flexShrink:0}}>
+
+        {/* Header */}
+        <div style={{padding:'16px 20px',borderBottom:'1px solid #e2e8f0',background:'#f8fafc',flexShrink:0}}>
+          <div style={{display:'flex',alignItems:'flex-start',gap:10}}>
+            <div style={{flex:1}}>
+              <div style={{fontWeight:700,fontSize:16,color:'#1e293b'}}>{car.no}</div>
+              <div style={{fontSize:12,color:'#64748b',marginTop:2}}>{car.proc} · {car.pname}</div>
+            </div>
+            <div style={{display:'flex',alignItems:'center',gap:8,flexShrink:0}}>
+              <SBadge s={car.status}/>
+              {od && <span style={{background:'#fef2f2',color:'#dc2626',border:'1px solid #fca5a5',borderRadius:4,fontSize:11,padding:'2px 7px',fontWeight:600}}>+{daysOD(car.due)}d overdue</span>}
+              {/* Prev / Next navigation */}
+              {(carList||[]).length > 1 && (
+                <div style={{display:'flex',alignItems:'center',gap:4,flexShrink:0}}>
+                  <button
+                    onClick={() => navTo(-1)}
+                    disabled={!hasPrev}
+                    title="Previous CAR"
+                    style={{background:'none',border:'1px solid #e2e8f0',borderRadius:4,padding:'2px 8px',cursor:hasPrev?'pointer':'not-allowed',color:hasPrev?'#475569':'#cbd5e1',fontSize:14,lineHeight:1}}>◀</button>
+                  <span style={{fontSize:11,color:'#64748b',minWidth:40,textAlign:'center'}}>{currentIdx+1}/{(carList||[]).length}</span>
+                  <button
+                    onClick={() => navTo(1)}
+                    disabled={!hasNext}
+                    title="Next CAR"
+                    style={{background:'none',border:'1px solid #e2e8f0',borderRadius:4,padding:'2px 8px',cursor:hasNext?'pointer':'not-allowed',color:hasNext?'#475569':'#cbd5e1',fontSize:14,lineHeight:1}}>▶</button>
+                </div>
+              )}
+              <button onClick={onClose} style={{background:'none',border:'none',fontSize:18,cursor:'pointer',color:'#94a3b8',padding:'2px 6px',lineHeight:1}} title="Close">✕</button>
+            </div>
+          </div>
+          <div style={{display:'flex',alignItems:'center',gap:8,marginTop:10}}>
+            {liveMode && !editing &&
+              <button onClick={startEdit} style={dbtn('blue')}>✏️ Edit</button>}
+            {savedOk &&
+              <span style={{fontSize:13,color:'#16a34a',fontWeight:600}}>✅ Saved to SharePoint</span>}
+            <div style={{fontSize:11,color:'#94a3b8',marginLeft:'auto',textAlign:'right',lineHeight:1.8}}>
+              <div><span style={{color:'#cbd5e1',marginRight:4}}>Created By</span>{userMap[String(car.by)] || car.by}</div>
+              <div><span style={{color:'#cbd5e1',marginRight:4}}>Submitted</span>{fmtD(car.submitted)}</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Stage progress indicator */}
+        {(() => {
+          const stages = ['Intake','Assignment','RCA & Action','Verification'];
+          const stageMap = {'New':0,'Assigned':1,'In Progress':2,'Under Review':3,'Closed':3,'Cancelled':3};
+          const active = stageMap[displayStatus] ?? 0;
+          return (
+            <div style={{display:'flex',alignItems:'center',padding:'10px 20px 8px',borderBottom:'1px solid #f1f5f9',background:'#f8fafc',flexShrink:0}}>
+              {stages.map((s,i) => (
+                <React.Fragment key={s}>
+                  <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:2,flex:1}}>
+                    <div style={{width:20,height:20,borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',fontSize:10,fontWeight:700,background:i<=active?'#2563eb':'#e2e8f0',color:i<=active?'#fff':'#94a3b8'}}>
+                      {i<active?'✓':i+1}
+                    </div>
+                    <div style={{fontSize:9.5,color:i===active?'#2563eb':i<active?'#64748b':'#94a3b8',fontWeight:i===active?700:400,textAlign:'center',whiteSpace:'nowrap'}}>{s}</div>
+                  </div>
+                  {i<stages.length-1 && <div style={{height:2,flex:2,background:i<active?'#2563eb':'#e2e8f0',marginBottom:12}} />}
+                </React.Fragment>
+              ))}
+            </div>
+          );
+        })()}
+
+        {/* Workflow action bar */}
+        <WorkflowActions car={displayStatus !== car.status ? {...car, status: displayStatus} : car} liveMode={liveMode} users={users} onQuickSave={quickSave} />
+
+        {/* Scrollable body */}
+        <div style={{flex:1,overflowY:'auto',padding:'18px 20px'}}>
+          {saveErr && (
+            <div style={{background:'#fef2f2',border:'1px solid #fca5a5',borderRadius:6,padding:'10px 14px',marginBottom:16,fontSize:13,color:'#dc2626',lineHeight:1.4}}>
+              ❌ {saveErr}
+            </div>
+          )}
+
+          <DrSection title="Intake & Triage">
+            <DrText    label="Summary"     value={editing?draft.brief:car.brief}    editing={editing} onChange={v=>setDraft({...draft,brief:v})} />
+            <DrField   label="Description" value={car.desc} multiline html={/<[a-z][\s\S]*>/i.test(car.desc)} />
+            <DrSelect  label="Type"        value={editing?draft.carType:car.type}   options={TYPE_OPTS}   editing={editing} onChange={v=>setDraft({...draft,carType:v})} />
+            <DrField   label="Source"      value={car.source} />
+            {/* Process — editable via datalist */}
+            <div style={{display:'flex',alignItems:'flex-start',padding:'6px 0',
+                         borderBottom:'1px solid #f1f5f9'}}>
+              <span style={{width:130,flexShrink:0,fontSize:12,fontWeight:600,
+                            color:'#475569',paddingTop:2}}>Process</span>
+              {editing ? (
+                <div style={{flex:1}}>
+                  <input list="dr-process-list" value={draft.process||''}
+                    onChange={e=>setDraft({...draft,process:e.target.value})}
+                    placeholder="Type or select a process…"
+                    style={{width:'100%',padding:'4px 8px',fontSize:12,
+                            border:'1px solid #cbd5e1',borderRadius:4,
+                            boxSizing:'border-box'}} />
+                  <datalist id="dr-process-list">
+                    {PROCESS_LIST.map(p=><option key={p} value={p}/>)}
+                  </datalist>
+                </div>
+              ) : (
+                <span style={{fontSize:12,color:'#1e293b'}}>
+                  {car.proc}{car.pname ? ' ' + car.pname : ''}
+                </span>
+              )}
+            </div>
+            <DrSelect  label="Priority"    value={editing?draft.priority:car.pri}   options={PRI_OPTS}    editing={editing} onChange={v=>setDraft({...draft,priority:v})} />
+          </DrSection>
+
+          <DrSection title="Assignment & Routing" active={['New','Assigned'].includes(car.status)}>
+            <DrSelect   label="Status"       value={editing?draft.status:car.status} options={STATUS_OPTS} editing={editing}
+              onChange={v => {
+                const closing = ['Closed','Cancelled'];
+                const updates = {...draft, status: v};
+                if (closing.includes(v) && !draft.dateClosed) {
+                  updates.dateClosed = new Date().toISOString().split('T')[0];
+                } else if (!closing.includes(v) && closing.includes(draft.status||car.status)) {
+                  updates.dateClosed = '';
+                }
+                setDraft(updates);
+              }} />
+            <DrAssignee label="Assigned To"  value={car.owner} users={users}          editing={editing} onChange={v=>setDraft({...draft,assignedToId:v})} />
+            <DrField    label="Date Assigned" value={fmtD(car.assigned)} />
+            <DrDate     label="Due Date"     value={editing?draft.dueDate:car.due}    editing={editing} onChange={v=>setDraft({...draft,dueDate:v})} />
+          </DrSection>
+
+          <DrSection title="Root Cause & Action Planning" active={['In Progress'].includes(car.status)}>
+            <DrText label="Containment / Immediate Corrections"
+              value={editing ? draft.containment : car.containment}
+              editing={editing} multiline
+              onChange={v=>setDraft({...draft,containment:v})} />
+            <DrText label="Root Cause"
+              value={editing ? draft.rootCause : car.rootCause}
+              editing={editing} multiline
+              onChange={v=>setDraft({...draft,rootCause:v})} />
+            <DrText label="Action Plan"
+              value={editing ? draft.actionPlan : car.actionPlan}
+              editing={editing} multiline
+              onChange={v=>setDraft({...draft,actionPlan:v})} />
+            <DrDate label="Date Action Completed"
+              value={editing ? draft.dateActionCompleted : car.dateActionCompleted}
+              editing={editing}
+              onChange={v=>setDraft({...draft,dateActionCompleted:v})} />
+            <DrCheckbox label="Follow-up Required" value={editing ? draft.followUp : car.followUp}
+              editing={editing} onChange={v=>setDraft({...draft,followUp:v})} />
+          </DrSection>
+
+          <DrSection title="Verification & Closure" active={['Under Review'].includes(car.status)}>
+            <DrSelect label="Result"
+              value={editing ? draft.result : car.result}
+              options={RESULT_OPTS} editing={editing}
+              onChange={v=>setDraft({...draft,result:v})} />
+            <DrDate label="Date Closed"
+              value={editing ? draft.dateClosed : car.closed}
+              editing={editing}
+              onChange={v=>setDraft({...draft,dateClosed:v})} />
+            <DrField label="Days to Close" value={car.daysClose} />
+          </DrSection>
+
+          <DrSection title="Notes">
+            <DrText label="Notes" value={editing?draft.notes:car.notes} editing={editing} multiline onChange={v=>setDraft({...draft,notes:v})} />
+          </DrSection>
+        </div>
+
+        {/* Footer — edit mode only */}
+        {editing && (
+          <div style={{padding:'12px 20px',borderTop:'1px solid #e2e8f0',background:'#f8fafc',flexShrink:0,display:'flex',gap:8,alignItems:'center'}}>
+            {savedOk && <span style={{fontSize:12,color:'#16a34a',fontWeight:600,marginRight:'auto'}}>✅ Saved</span>}
+            <div style={{marginLeft: savedOk ? 0 : 'auto', display:'flex', gap:8}}>
+              <button onClick={cancelEdit} style={dbtn('gray')} disabled={saving}>Cancel</button>
+              <button onClick={save} style={dbtn('green')} disabled={saving}>
+                {saving ? '⏳ Saving…' : '💾 Save to SharePoint'}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ── Submit CAR Tab ──────────────────────────────────────────── */
+function SFRow({ label, required, error, children, half }) {
+  return (
+    <div style={{marginBottom: error ? 14 : 18}}>
+      <label style={{display:'block',fontSize:12,fontWeight:600,color:error?'#dc2626':'#475569',marginBottom:5}}>
+        {label}{required && <span style={{color:'#dc2626',marginLeft:3}}>*</span>}
+      </label>
+      {children}
+      {error && <div style={{fontSize:11,color:'#dc2626',marginTop:4}}>{error}</div>}
+    </div>
+  );
+}
+
+/* ── Process list (module-level, shared by Submit + Edit screens) ── */
+const PROCESS_LIST = [
+  'QP-01 QMS Documentation Control and Maintenance',
+  'QP-02 Management Review',
+  'QP-03 Internal Audit',
+  'QP-04 Nonconformance and Corrective Action',
+  'QP-05 Competency, Training and Awareness',
+  'QP-06 Customer Satisfaction and Feedback',
+  'QP-07 Supplier and Contract Management',
+  'QP-08 Risk and Opportunity Management',
+  'QP-09 Site Safety, Hazard Assessment and Toolbox Talks',
+  'QP-10 Incident Reporting and Emergency Action Plan',
+  'QP-11 Design and Development',
+  'QP-12 Document Control in Procore',
+  'Other',
+];
+
+function SubmitCARTab({ cars, liveMode, onSubmitted }) {
+  const BLANK = {type:'OFI',source:'',process:'',priority:'Low',submittedBy:'',brief:'',desc:''};
+  const [form,      setForm]      = useState(BLANK);
+  const [errors,    setErrors]    = useState({});
+  const [submitting,setSubmitting]= useState(false);
+  const [submitErr, setSubmitErr] = useState(null);
+  const [submitted, setSubmitted] = useState(null);
+
+  // Pre-fill submitter name from signed-in user
+  useEffect(() => {
+    if (liveMode) {
+      fetch('/api/me').then(r=>r.json()).then(d=>{
+        if (d.name) setForm(f => f.submittedBy ? f : {...f, submittedBy: d.name});
+      }).catch(()=>{});
+    }
+  }, [liveMode]);
+
+  // Static QP process list — keeps the dropdown clean regardless of what's in live data
+  const processList = PROCESS_LIST;  // defined at module level
+
+  const setF = (k,v) => { setForm(f=>({...f,[k]:v})); if(errors[k]) setErrors(e=>({...e,[k]:null})); };
+
+  const validate = () => {
+    const e = {};
+    if (!form.source)        e.source  = 'Please select a source';
+    if (!form.process.trim())e.process = 'Please enter or select the affected process';
+    if (!form.brief.trim())  e.brief   = 'Required — this becomes the CAR title in SharePoint';
+    if (!form.desc.trim())   e.desc    = 'Required — describe the issue in detail';
+    return e;
+  };
+
+  const doSubmit = async () => {
+    const e = validate();
+    if (Object.keys(e).length) { setErrors(e); return; }
+    if (!liveMode) { setSubmitErr('Not connected to SharePoint. Sign in first.'); return; }
+    setSubmitting(true); setSubmitErr(null);
+    try {
+      const r = await fetch('/api/submit', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify(form)
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error||'Submit failed');
+      setSubmitted({id:j.id, no:j.no});
+      setForm(BLANK);
+      onSubmitted();
+    } catch(err) { setSubmitErr(err.message); }
+    setSubmitting(false);
+  };
+
+  const inp = (err) => ({
+    fontSize:13,padding:'7px 10px',border:`1px solid ${err?'#fca5a5':'#cbd5e1'}`,
+    borderRadius:6,width:'100%',boxSizing:'border-box',color:'#1e293b',
+    background:err?'#fff5f5':'#fff',fontFamily:'inherit'
+  });
+  const sel = (err) => ({...inp(err),cursor:'pointer'});
+  const card = {background:'#fff',borderRadius:10,border:'1px solid #e2e8f0',padding:'20px 24px',marginBottom:18};
+  const sectionHdr = {fontSize:11,fontWeight:700,color:'#94a3b8',textTransform:'uppercase',letterSpacing:'.08em',marginBottom:16};
+
+  if (submitted) {
+    return (
+      <div style={{maxWidth:500,margin:'64px auto',textAlign:'center',padding:'40px 32px',background:'#f0fdf4',borderRadius:14,border:'1px solid #bbf7d0'}}>
+        <div style={{fontSize:52,marginBottom:14}}>✅</div>
+        <div style={{fontSize:22,fontWeight:700,color:'#15803d',marginBottom:8}}>CAR Submitted</div>
+        <div style={{fontSize:14,color:'#166534',marginBottom:28,lineHeight:1.6}}>
+          CAR {submitted.no} has been added to the SharePoint CAR Log.<br/>
+          Status is <strong>New</strong> — go to the CAR Log to assign it.
+        </div>
+        <div style={{display:'flex',gap:12,justifyContent:'center'}}>
+          <button onClick={()=>setSubmitted(null)}
+            style={{fontSize:13,padding:'9px 22px',background:'#16a34a',color:'#fff',border:'none',borderRadius:6,cursor:'pointer',fontWeight:600}}>
+            + Submit Another
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{maxWidth:620,margin:'24px auto',padding:'0 16px 48px'}}>
+      <div style={{marginBottom:22}}>
+        <div style={{fontSize:19,fontWeight:700,color:'#1e293b'}}>📝 Submit New CAR</div>
+        <div style={{fontSize:13,color:'#64748b',marginTop:3}}>Creates a new item in the SharePoint CAR Log with Status = New</div>
+      </div>
+      {!liveMode && (
+        <div style={{background:'#fef3c7',border:'1px solid #fcd34d',borderRadius:8,padding:'12px 16px',marginBottom:20,fontSize:13,color:'#92400e',lineHeight:1.5}}>
+          ⚠️ Running on sample data — sign in to SharePoint to submit CARs live.
+        </div>
+      )}
+      {submitErr && (
+        <div style={{background:'#fef2f2',border:'1px solid #fca5a5',borderRadius:8,padding:'12px 16px',marginBottom:20,fontSize:13,color:'#dc2626'}}>
+          ❌ {submitErr}
+        </div>
+      )}
+
+      {/* Intake Details */}
+      <div style={card}>
+        <div style={sectionHdr}>Intake Details</div>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'0 20px'}}>
+          <SFRow label="Type" required>
+            <select value={form.type} onChange={e=>setF('type',e.target.value)} style={sel(false)}>
+              {TYPE_OPTS.map(o=><option key={o}>{o}</option>)}
+            </select>
+          </SFRow>
+          <SFRow label="Priority" required>
+            <select value={form.priority} onChange={e=>setF('priority',e.target.value)} style={sel(false)}>
+              {PRI_OPTS.map(o=><option key={o}>{o}</option>)}
+            </select>
+          </SFRow>
+        </div>
+        <SFRow label="Source" required error={errors.source}>
+          <select value={form.source} onChange={e=>setF('source',e.target.value)} style={sel(!!errors.source)}>
+            <option value="">— select —</option>
+            {SOURCE_OPTS.map(o=><option key={o}>{o}</option>)}
+          </select>
+        </SFRow>
+        <SFRow label="Process" required error={errors.process}>
+          <input list="submit-process-list" value={form.process}
+            onChange={e=>setF('process',e.target.value)}
+            placeholder="Type or select — e.g. QP-06 Training & Competency"
+            style={inp(!!errors.process)} />
+          <datalist id="submit-process-list">
+            {processList.map(p=><option key={p} value={p}/>)}
+          </datalist>
+        </SFRow>
+      </div>
+
+      {/* Description */}
+      <div style={card}>
+        <div style={sectionHdr}>Description</div>
+        <SFRow label="Summary" required error={errors.brief}>
+          <input type="text" value={form.brief} onChange={e=>setF('brief',e.target.value)}
+            placeholder="One-line descriptive title for this CAR"
+            style={inp(!!errors.brief)} />
+        </SFRow>
+        <SFRow label="Describe the issue in detail" required error={errors.desc}>
+          <textarea value={form.desc} onChange={e=>setF('desc',e.target.value)} rows={5}
+            placeholder="What happened? Where? When? What was the impact?"
+            style={{...inp(!!errors.desc),resize:'vertical',lineHeight:1.55}} />
+        </SFRow>
+      </div>
+
+      {/* Submitter */}
+      <div style={card}>
+        <div style={sectionHdr}>Submitter</div>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'0 20px'}}>
+          <SFRow label="Your Name">
+            <input type="text" value={form.submittedBy} disabled
+              placeholder="Loading…"
+              style={{...inp(false),background:'#f8fafc',color:'#94a3b8',cursor:'not-allowed'}} />
+          </SFRow>
+          <SFRow label="Date Submitted">
+            <input type="text" disabled
+              value={new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}
+              style={{...inp(false),background:'#f8fafc',color:'#94a3b8',cursor:'not-allowed'}} />
+          </SFRow>
+        </div>
+      </div>
+
+      {/* Actions */}
+      <div style={{display:'flex',justifyContent:'flex-end',gap:12}}>
+        <button onClick={()=>{setForm(blank());setErrors({});setSubmitErr(null);}}
+          style={{fontSize:13,padding:'9px 18px',background:'none',color:'#64748b',border:'1px solid #e2e8f0',borderRadius:6,cursor:'pointer'}}>
+          Clear
+        </button>
+        <button onClick={doSubmit} disabled={submitting}
+          style={{fontSize:13,padding:'9px 24px',background:liveMode?'#2563eb':'#94a3b8',color:'#fff',border:'none',
+            borderRadius:6,cursor:submitting?'wait':'pointer',fontWeight:600,opacity:submitting?.7:1}}>
+          {submitting ? '⏳ Submitting…' : '📤 Submit CAR to SharePoint'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+
+/* ── My CARs (Assignee) Tab ─────────────────────────────────────────────────
+   Shows active CARs assigned to the current user (or ?owner=Name).
+   Side-by-side current/new layout with append-with-timestamp saves.        */
+function AssigneeCARsTab({ cars, liveMode, currentUser, onRefresh }) {
+  const [ownerName, setOwnerName] = useState(() => {
+    try {
+      const p = new URLSearchParams(window.location.search);
+      return p.get('owner') || currentUser || '';
+    } catch(_) { return currentUser || ''; }
+  });
+  const [nameInput,  setNameInput]  = useState(ownerName);
+  const [selectedId, setSelectedId] = useState(null);
+  const _todayStr = () => new Date().toISOString().split('T')[0];
+  const [edits,      setEdits]      = useState({ containment:'', rootCause:'', actionPlan:'', notes:'' });
+  const [actionDate, setActionDate] = useState(_todayStr);
+  const [saving,     setSaving]     = useState(false);
+  const [saveErr,    setSaveErr]    = useState(null);
+  const [savedOk,    setSavedOk]    = useState(false);
+  const [copied,     setCopied]     = useState(false);
+
+  useEffect(() => { if (!ownerName && currentUser) { setOwnerName(currentUser); setNameInput(currentUser); } }, [currentUser]);
+
+  const myCars = (cars || []).filter(c =>
+    ownerName && c.owner &&
+    c.owner.toLowerCase() === ownerName.toLowerCase() &&
+    ['Assigned', 'In Progress', 'Under Review'].includes(c.status)
+  );
+  const selectedCar = myCars.find(c => String(c.id) === String(selectedId)) || null;
+
+  useEffect(() => {
+    setEdits({ containment:'', rootCause:'', actionPlan:'', notes:'' });
+    setActionDate(_todayStr());
+    setSaveErr(null); setSavedOk(false);
+  }, [selectedId]);
+
+  const shareUrl = (() => {
+    try {
+      const u = new URL(window.location.href);
+      u.searchParams.set('owner', ownerName);
+      return u.toString();
+    } catch(_) { return ''; }
+  })();
+
+  const copyUrl = () => {
+    if (!shareUrl) return;
+    navigator.clipboard.writeText(shareUrl)
+      .then(() => { setCopied(true); setTimeout(() => setCopied(false), 2500); })
+      .catch(() => { window.prompt('Copy this URL:', shareUrl); });
+  };
+
+  // Append new text as a timestamped entry — double newline for readability
+  const appendTs = (existing, newText) => {
+    if (!newText.trim()) return existing || '';
+    const ts = new Date().toLocaleString('en-US', {
+      month:'2-digit', day:'2-digit', year:'numeric',
+      hour:'2-digit', minute:'2-digit', hour12:true });
+    const entry = '[' + ts + '] ' + newText.trim();
+    return existing ? existing + '\n\n' + entry : entry;
+  };
+
+  const doSave = async (submitForVerification = false) => {
+    if (!selectedCar) return;
+    setSaving(true); setSaveErr(null);
+    const fields = {};
+    if (edits.containment.trim()) fields.containment = appendTs(selectedCar.containment, edits.containment);
+    if (edits.rootCause.trim())   fields.rootCause   = appendTs(selectedCar.rootCause,   edits.rootCause);
+    if (edits.actionPlan.trim())  fields.actionPlan  = appendTs(selectedCar.actionPlan,  edits.actionPlan);
+    if (edits.notes.trim())       fields.notes       = appendTs(selectedCar.notes,       edits.notes);
+    if (submitForVerification) {
+      const hasRCA = !!(
+        (fields.rootCause  || selectedCar.rootCause  || '').trim() &&
+        (fields.actionPlan || selectedCar.actionPlan || '').trim()
+      );
+      if (!hasRCA) {
+        setSaveErr('Root Cause and Action Plan must both be filled in before submitting for verification.');
+        setSaving(false); return;
+      }
+      fields.status = 'Under Review';
+      fields.dateActionCompleted = actionDate || new Date().toISOString().split('T')[0];
+    }
+    if (!Object.keys(fields).length) { setSaving(false); return; }
+    try {
+      const r = await fetch('/api/update', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: selectedCar.id, fields }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || 'Save failed');
+      setSavedOk(true);
+      setEdits({ containment:'', rootCause:'', actionPlan:'', notes:'' });
+      setTimeout(() => setSavedOk(false), 3000);
+      onRefresh();
+      if (submitForVerification) setSelectedId(null);
+    } catch(e) {
+      setSaveErr(e.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  /* ── Styles ── */
+  const card   = { background:'#fff', border:'1px solid #e2e8f0', borderRadius:8, padding:'18px 20px', marginBottom:16 };
+  const sHdr   = { fontSize:11, fontWeight:700, color:'#94a3b8', textTransform:'uppercase', letterSpacing:'.08em', marginBottom:8 };
+  const sbLbl  = { fontSize:11.5, fontWeight:600, color:'#475569', marginBottom:4 };
+  const sbCur  = { fontSize:12.5, color:'#1e293b', lineHeight:1.6, whiteSpace:'pre-wrap',
+                   background:'#f8fafc', border:'1px solid #e2e8f0', borderRadius:6,
+                   padding:'8px 10px', minHeight:64, maxHeight:180, overflowY:'auto' };
+  const sbNew  = { fontSize:12.5, lineHeight:1.6, resize:'vertical', background:'#fff',
+                   border:'1px solid #cbd5e1', borderRadius:6, padding:'8px 10px',
+                   minHeight:64, width:'100%', boxSizing:'border-box', fontFamily:'inherit' };
+  const btnPri = (dis) => ({ padding:'9px 20px', borderRadius:6, border:'none', fontWeight:600,
+                   fontSize:13, cursor:dis?'not-allowed':'pointer',
+                   background:dis?'#94a3b8':'#2563eb', color:'#fff', opacity:dis?.7:1 });
+  const btnGrn = (dis) => ({ ...btnPri(dis), background:dis?'#94a3b8':'#16a34a' });
+  const btnGry = { padding:'9px 16px', borderRadius:6, border:'1px solid #e2e8f0',
+                   fontWeight:500, fontSize:13, cursor:'pointer', background:'#f8fafc', color:'#475569' };
+
+  if (!liveMode) return (
+    <div style={{padding:'40px 32px', color:'#64748b', fontSize:14}}>
+      My CARs requires a live SharePoint connection.
+    </div>
+  );
+
+  if (!ownerName) return (
+    <div style={{padding:'40px 32px', maxWidth:420}}>
+      <div style={{fontSize:17, fontWeight:700, color:'#1e293b', marginBottom:8}}>My CARs</div>
+      <div style={{fontSize:13, color:'#64748b', marginBottom:20}}>
+        Enter your name as it appears in SharePoint, or bookmark
+        the URL with <code>?owner=YourName</code>.
+      </div>
+      <div style={{display:'flex', gap:8}}>
+        <input value={nameInput} onChange={e=>setNameInput(e.target.value)}
+          onKeyDown={e=>{ if (e.key==='Enter' && nameInput.trim()) setOwnerName(nameInput.trim()); }}
+          placeholder="Your SharePoint display name"
+          style={{flex:1, padding:'8px 12px', border:'1px solid #cbd5e1', borderRadius:6, fontSize:13}} />
+        <button onClick={()=>{ if (nameInput.trim()) setOwnerName(nameInput.trim()); }}
+          style={btnPri(!nameInput.trim())}>Go</button>
+      </div>
+    </div>
+  );
+
+  return (
+    <div style={{display:'flex', gap:0, height:'calc(100vh - 140px)', overflow:'hidden'}}>
+      {/* Left: CAR list */}
+      <div style={{width:260, flexShrink:0, borderRight:'1px solid #e2e8f0', overflowY:'auto', background:'#f8fafc'}}>
+        <div style={{padding:'14px 16px', borderBottom:'1px solid #e2e8f0'}}>
+          <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:4}}>
+            <div style={{fontSize:13, fontWeight:700, color:'#1e293b'}}>My CARs</div>
+            <button onClick={copyUrl} title="Copy shareable link"
+              style={{background:'none', border:'none', cursor:'pointer', fontSize:13,
+                      color:copied?'#16a34a':'#2563eb', padding:'2px 4px'}}>
+              {copied ? '✓ Copied' : '🔗'}
+            </button>
+          </div>
+          <div style={{fontSize:11, color:'#64748b'}}>{ownerName}</div>
+          {myCars.length === 0 && <div style={{fontSize:11.5, color:'#94a3b8', marginTop:8}}>No active CARs assigned.</div>}
+        </div>
+        {myCars.map(c => (
+          <div key={c.id} onClick={()=>setSelectedId(String(c.id))}
+            style={{padding:'10px 16px', cursor:'pointer', borderBottom:'1px solid #f1f5f9',
+                    background:String(c.id)===String(selectedId)?'#eff6ff':'transparent',
+                    borderLeft:String(c.id)===String(selectedId)?'3px solid #2563eb':'3px solid transparent'}}>
+            <div style={{fontSize:12.5, fontWeight:700, color:'#1e293b'}}>{c.no}</div>
+            <div style={{fontSize:11, color:'#64748b', marginTop:2, whiteSpace:'nowrap',
+                         overflow:'hidden', textOverflow:'ellipsis'}}>{c.brief||'(no summary)'}</div>
+            <div style={{marginTop:4}}><SBadge s={c.status} /></div>
+          </div>
+        ))}
+      </div>
+
+      {/* Right: Detail panel */}
+      <div style={{flex:1, overflowY:'auto', padding:'20px 24px'}}>
+        {!selectedCar ? (
+          <div style={{paddingTop:60, textAlign:'center', color:'#94a3b8', fontSize:14}}>
+            Select a CAR from the list to update it.
+          </div>
+        ) : (
+          <div style={{maxWidth:800}}>
+            <div style={{display:'flex', alignItems:'center', gap:12, marginBottom:20}}>
+              <div>
+                <div style={{fontSize:17, fontWeight:700, color:'#1e293b'}}>{selectedCar.no}</div>
+                <div style={{fontSize:12.5, color:'#64748b', marginTop:2}}>{selectedCar.proc} · {selectedCar.pname}</div>
+              </div>
+              <SBadge s={selectedCar.status} />
+            </div>
+
+            {saveErr && <div style={{background:'#fef2f2',border:'1px solid #fca5a5',borderRadius:6,padding:'10px 14px',marginBottom:16,fontSize:13,color:'#dc2626'}}>❌ {saveErr}</div>}
+            {savedOk && <div style={{background:'#f0fdf4',border:'1px solid #bbf7d0',borderRadius:6,padding:'10px 14px',marginBottom:16,fontSize:13,color:'#16a34a'}}>✅ Saved successfully.</div>}
+
+            {[
+              { key:'containment', label:'Containment Action',   hint:'Immediate steps taken to contain the issue.' },
+              { key:'rootCause',   label:'Root Cause',           hint:'Underlying cause — use 5-Why or fishbone analysis.' },
+              { key:'actionPlan',  label:'Action Plan',          hint:'Corrective / preventive actions and responsible parties.' },
+              { key:'notes',       label:'Notes / Comments',     hint:'Additional observations, follow-up items, or reviewer feedback.' },
+            ].map(({ key, label, hint }) => (
+              <div key={key} style={card}>
+                <div style={sHdr}>{label}</div>
+                <div style={{fontSize:11.5, color:'#64748b', marginBottom:10}}>{hint}</div>
+                <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:16}}>
+                  <div>
+                    <div style={sbLbl}>Current</div>
+                    <div style={sbCur}>
+                      {selectedCar[key] || <span style={{color:'#94a3b8',fontStyle:'italic'}}>Empty</span>}
+                    </div>
+                  </div>
+                  <div>
+                    <div style={sbLbl}>Add / Update</div>
+                    <textarea value={edits[key]}
+                      onChange={e=>setEdits(d=>({...d,[key]:e.target.value}))}
+                      placeholder={'Type new ' + label.toLowerCase() + ' entry here…'}
+                      style={sbNew} rows={4} />
+                    <div style={{fontSize:11,color:'#94a3b8',marginTop:4}}>
+                      New text is appended as a dated entry — existing history is preserved.
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+
+            <div style={{display:'flex', gap:12, alignItems:'center', paddingTop:4, paddingBottom:32}}>
+              <button onClick={()=>doSave(false)} disabled={saving} style={btnPri(saving)}>
+                {saving ? '⏳ Saving…' : '💾 Save & Continue'}
+              </button>
+              <label style={{display:'flex',alignItems:'center',gap:6,fontSize:12,color:'#64748b'}}>
+                <span style={{fontWeight:600,whiteSpace:'nowrap'}}>Action Date:</span>
+                <input type='date' value={actionDate} onChange={e=>setActionDate(e.target.value)}
+                  style={{fontSize:12,padding:'4px 8px',border:'1px solid #cbd5e1',borderRadius:6,color:'#1e293b'}} />
+              </label>
+              <button onClick={()=>doSave(true)}
+                disabled={saving || selectedCar.status==='Under Review'}
+                style={btnGrn(saving || selectedCar.status==='Under Review')}>
+                {saving ? '⏳ Saving…' : 'Submit for Verification →'}
+              </button>
+              <button onClick={()=>setSelectedId(null)} style={btnGry}>← Back</button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+
+/* ── Management Review Tab ───────────────────────────────────────────────
+   Phase 5 — QMS Health Report for Management Review.
+   Mirrors the QF-10 CAPA Log Report/Data worksheet structure.
+   All data computed client-side from the live SharePoint cars array.     */
+
+// ── MR chart components ────────────────────────────────────────────────
+function MrTrendChart({ cars, monthCount }) {
+  const ref = useRef(null); const inst = useRef(null);
+  useEffect(() => {
+    if (!ref.current) return;
+    const months = [];
+    const now = TODAY;
+    for (let i = monthCount - 1; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      months.push({ y: d.getFullYear(), mo: d.getMonth(),
+        m: d.toLocaleDateString('en-US', { month:'short', year:'2-digit' }),
+        C: 0, P: 0, O: 0 });
+    }
+    cars.forEach(c => {
+      if (!c.submitted) return;
+      const sd = new Date(c.submitted);
+      const slot = months.find(m => m.y === sd.getFullYear() && m.mo === sd.getMonth());
+      if (!slot) return;
+      if (c.type === 'Corrective') slot.C++;
+      else if (c.type === 'Preventive') slot.P++;
+      else slot.O++;
+    });
+    if (inst.current) inst.current.destroy();
+    inst.current = new Chart(ref.current, {
+      type: 'bar',
+      data: {
+        labels: months.map(d => d.m),
+        datasets: [
+          { label: 'Corrective', data: months.map(d => d.C), backgroundColor: '#2563eb', stack: 's' },
+          { label: 'Preventive', data: months.map(d => d.P), backgroundColor: '#7c3aed', stack: 's' },
+          { label: 'OFI',        data: months.map(d => d.O), backgroundColor: '#0891b2', stack: 's' },
+        ],
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { position: 'bottom', labels: { font: { size: 11 }, boxWidth: 12, padding: 10 } } },
+        scales: {
+          x: { stacked: true, grid: { display: false }, ticks: { font: { size: 10 } } },
+          y: { stacked: true, grid: { color: '#f1f5f9' }, ticks: { font: { size: 11 }, stepSize: 1, precision: 0 } },
+        },
+      },
+    });
+    return () => { if (inst.current) inst.current.destroy(); };
+  }, [cars, monthCount]);
+  return (
+    <div style={{ position:'relative', height: 220, width:'100%', overflowX:'hidden' }}>
+      <canvas ref={ref} />
+    </div>
+  );
+}
+
+function MrSourceChart({ cars }) {
+  const ref = useRef(null); const inst = useRef(null);
+  useEffect(() => {
+    if (!ref.current) return;
+    const bySrc = {};
+    cars.forEach(c => { if (c.source) bySrc[c.source] = (bySrc[c.source] || 0) + 1; });
+    const labels = Object.keys(bySrc).sort((a, b) => bySrc[b] - bySrc[a]);
+    const data   = labels.map(l => bySrc[l]);
+    const COLS = ['#2563eb','#7c3aed','#0891b2','#059669','#d97706','#dc2626','#475569'];
+    if (inst.current) inst.current.destroy();
+    inst.current = new Chart(ref.current, {
+      type: 'doughnut',
+      data: { labels, datasets: [{ data, backgroundColor: COLS.slice(0, labels.length), hoverOffset: 4 }] },
+      options: {
+        responsive: true, maintainAspectRatio: false, cutout: '58%',
+        plugins: { legend: { position: 'bottom', labels: { font: { size: 10 }, boxWidth: 10, padding: 8 } } },
+      },
+    });
+    return () => { if (inst.current) inst.current.destroy(); };
+  }, [cars]);
+  return (
+    <div style={{ position:'relative', height: 220, width:'100%', overflowX:'hidden' }}>
+      <canvas ref={ref} />
+    </div>
+  );
+}
+
+function MrTypeChart({ cars }) {
+  const ref = useRef(null); const inst = useRef(null);
+  useEffect(() => {
+    if (!ref.current) return;
+    const counts = { Corrective: 0, Preventive: 0, OFI: 0 };
+    cars.forEach(c => { if (counts[c.type] !== undefined) counts[c.type]++; else counts['OFI']++; });
+    if (inst.current) inst.current.destroy();
+    inst.current = new Chart(ref.current, {
+      type: 'doughnut',
+      data: {
+        labels: ['Corrective', 'Preventive', 'OFI'],
+        datasets: [{ data: [counts.Corrective, counts.Preventive, counts.OFI],
+          backgroundColor: ['#2563eb', '#7c3aed', '#0891b2'], hoverOffset: 4 }],
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false, cutout: '58%',
+        plugins: { legend: { position: 'bottom', labels: { font: { size: 10 }, boxWidth: 10, padding: 8 } } },
+      },
+    });
+    return () => { if (inst.current) inst.current.destroy(); };
+  }, [cars]);
+  return (
+    <div style={{ position:'relative', height: 220, width:'100%', overflowX:'hidden' }}>
+      <canvas ref={ref} />
+    </div>
+  );
+}
+
+// ── Main MgmtReviewTab component ───────────────────────────────────────
+function MgmtReviewTab({ cars }) {
+  const [preset,     setPreset]     = useState('12mo');
+  const [customFrom, setCustomFrom] = useState('');
+  const [customTo,   setCustomTo]   = useState('');
+  const [showStatus, setShowStatus] = useState(true);
+
+  // Compute from/to dates from preset
+  const { fromDate, toDate, periodLabel, monthCount } = (() => {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    if (preset === 'custom') {
+      const f = customFrom ? new Date(customFrom) : null;
+      const t = customTo   ? new Date(customTo)   : today;
+      const mc = f ? Math.max(3, Math.ceil((t - f) / (30 * 86400000))) : 12;
+      return { fromDate: f, toDate: t, periodLabel: 'Custom Range', monthCount: mc };
+    }
+    let f = null, label = 'All Time', mc = 24;
+    if (preset === '6mo')  { f = new Date(today); f.setMonth(f.getMonth()-6);      label = 'Last 6 Months';   mc = 6; }
+    if (preset === '12mo') { f = new Date(today); f.setMonth(f.getMonth()-12);     label = 'Last 12 Months';  mc = 12; }
+    if (preset === '24mo') { f = new Date(today); f.setMonth(f.getMonth()-24);     label = 'Last 24 Months';  mc = 24; }
+    if (preset === '36mo') { f = new Date(today); f.setMonth(f.getMonth()-36);     label = 'Last 36 Months';  mc = 36; }
+    if (preset === 'ytd')  { f = new Date(today.getFullYear(), 0, 1);             label = `YTD ${today.getFullYear()}`; mc = today.getMonth()+1; }
+    return { fromDate: f, toDate: today, periodLabel: label, monthCount: mc };
+  })();
+
+  // Filtered cars by submission date
+  const fCars = fromDate
+    ? cars.filter(c => { if (!c.submitted) return false; const d = new Date(c.submitted); return d >= fromDate && d <= toDate; })
+    : [...cars];
+
+  // ── Computed metrics (all-time) ────────────────────────────────────
+  // isEP: Employee Proactive — Preventive or any OFI variant from SharePoint
+  const isEP = c => /^(preventive|ofi|opportunity)/i.test(c.type || '');
+
+  const aAll   = cars.length;
+  // aClosedArr: formally Closed only (for verification result counts)
+  const aClosedArr = cars.filter(c => c.status === 'Closed');
+  const aClosed    = aClosedArr.length;
+  // aDoneArr: Closed + Cancelled (on-time rate, avg days, late processing)
+  const aDoneArr   = cars.filter(c => ['Closed','Cancelled'].includes(c.status));
+  const aOpen  = cars.filter(c => !['Closed','Cancelled'].includes(c.status)).length;
+  const aNew   = cars.filter(c => c.status === 'New').length;
+  const aOD    = cars.filter(isOD).length;
+  const aLate  = aDoneArr.filter(c => c.due && c.closed && new Date(c.closed)>new Date(c.due)).length;
+  const aUR    = cars.filter(c => c.status === 'Under Review').length;
+  const aFail  = aClosedArr.filter(c => c.result==='Fail').length;
+  const aPass  = aClosedArr.filter(c => c.result==='Pass'||c.result==='N/A').length;
+  const aCust  = cars.filter(c => c.source && /customer/i.test(c.source)).length;
+  const aPrev  = cars.filter(isEP).length;
+
+  // ── Computed metrics (filtered period) ────────────────────────────
+  const fAll   = fCars.length;
+  // fClosedArr: Closed only (for verification result counts)
+  const fClosedArr    = fCars.filter(c => c.status === 'Closed');
+  const fClosed       = fClosedArr.length;
+  // fDoneArr: Closed + Cancelled (on-time rate, avg days, late count)
+  const fDoneArr      = fCars.filter(c => ['Closed','Cancelled'].includes(c.status));
+  const fDone         = fDoneArr.length;
+  const fOpen  = fCars.filter(c => !['Closed','Cancelled'].includes(c.status)).length;
+  const fNew   = fCars.filter(c => c.status === 'New').length;
+  const fOD    = fCars.filter(isOD).length;
+  const fLate  = fDoneArr.filter(c => c.due && c.closed && new Date(c.closed)>new Date(c.due)).length;
+  const fUR    = fCars.filter(c => c.status === 'Under Review').length;
+  const fFail  = fClosedArr.filter(c => c.result==='Fail').length;
+  const fPass  = fClosedArr.filter(c => c.result==='Pass'||c.result==='N/A').length;
+  const fCust  = fCars.filter(c => c.source && /customer/i.test(c.source)).length;
+  const fPrev  = fCars.filter(isEP).length;
+
+  // On-time closure rate — Closed/Cancelled where Action Complete Date ≤ Due Date
+  const onTimeN   = fDoneArr.filter(c => c.due && c.dateActionCompleted &&
+                      new Date(c.dateActionCompleted) <= new Date(c.due)).length;
+  const onTimePct = fDone ? Math.round(onTimeN / fDone * 100) : null;
+
+  // Avg days to close — submitted → Action Complete Date (Closed + Cancelled)
+  const daysArr   = fDoneArr.filter(c => c.dateActionCompleted && c.submitted)
+                             .map(c => (new Date(c.dateActionCompleted)-new Date(c.submitted))/86400000);
+  const avgDays   = daysArr.length ? Math.round(daysArr.reduce((s,v)=>s+v,0)/daysArr.length) : null;
+
+  // Period months span (for avg/month calcs)
+  const spanMonths = fromDate ? Math.max(1, Math.ceil((toDate-fromDate)/(30*86400000))) : null;
+  const allSpanMo  = cars.length ? Math.max(1, (() => {
+    const dates = cars.filter(c=>c.submitted).map(c=>new Date(c.submitted));
+    if (!dates.length) return 1;
+    const earliest = new Date(Math.min(...dates));
+    return Math.max(1, Math.ceil((TODAY-earliest)/(30*86400000)));
+  })()) : 1;
+
+  // ── By-Process breakdown table ─────────────────────────────────────
+  const procBreakdown = (() => {
+    const map = {};
+    fCars.forEach(c => {
+      const key = c.proc ? c.proc + (c.pname ? ' ' + c.pname : '') : (c.pname || 'Other');
+      if (!map[key]) map[key] = { total:0, C:0, P:0, O:0 };
+      map[key].total++;
+      if (c.type==='Corrective') map[key].C++;
+      else if (c.type==='Preventive') map[key].P++;
+      else map[key].O++;
+    });
+    return Object.entries(map).sort((a,b) => b[1].total - a[1].total);
+  })();
+
+  // ── Styles ─────────────────────────────────────────────────────────
+  const card     = { background:'#fff', border:'1px solid #e2e8f0', borderRadius:8, padding:'18px 20px', marginBottom:16 };
+  const cardHdr  = { fontSize:11, fontWeight:700, color:'#94a3b8', textTransform:'uppercase', letterSpacing:'.08em', marginBottom:12 };
+  const kpiBox = (met) => ({
+    flex:1, minWidth:180, background:'#fff', border:`1px solid ${met===null?'#e2e8f0':met?'#bbf7d0':'#fca5a5'}`,
+    borderRadius:8, padding:'14px 18px', display:'flex', flexDirection:'column', gap:4,
+  });
+  const PRESETS = [
+    { id:'6mo', label:'6 mo' }, { id:'12mo', label:'12 mo' },
+    { id:'24mo', label:'24 mo' }, { id:'36mo', label:'36 mo' },
+    { id:'ytd', label:'YTD' }, { id:'all', label:'All Time' },
+    { id:'custom', label:'Custom…' },
+  ];
+
+  const pill = (active) => ({
+    padding:'5px 12px', borderRadius:20, border:`1px solid ${active?'#2563eb':'#e2e8f0'}`,
+    background:active?'#eff6ff':'#fff', color:active?'#2563eb':'#64748b',
+    fontSize:12, fontWeight:active?600:400, cursor:'pointer',
+  });
+
+  // sumRow removed — replaced by visual Executive Summary layout
+
+  const today = new Date();
+  const reportDate = today.toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'});
+
+  return (
+    <div style={{padding:'20px 24px', maxWidth:1100, margin:'0 auto'}}>
+
+      {/* Print-only header */}
+      <div className="mr-print-hdr" style={{marginBottom:20}}>
+        <div style={{fontSize:18,fontWeight:700}}>ASI Product PPS — Management Review Report</div>
+        <div style={{fontSize:12,color:'#64748b',marginTop:4}}>Generated: {reportDate} · Period: {periodLabel} · QP-04 CAPA KPIs</div>
+        <hr style={{marginTop:12,border:'none',borderTop:'2px solid #2563eb'}}/>
+      </div>
+
+      {/* Filter bar */}
+      <div className="mr-no-print" style={{display:'flex',alignItems:'center',gap:8,marginBottom:20,flexWrap:'wrap'}}>
+        <span style={{fontSize:12,fontWeight:600,color:'#475569',marginRight:4}}>Period:</span>
+        {PRESETS.map(p => (
+          <button key={p.id} onClick={()=>setPreset(p.id)} style={pill(preset===p.id)}>{p.label}</button>
+        ))}
+        {preset==='custom' && (
+          <>
+            <input type="date" value={customFrom} onChange={e=>setCustomFrom(e.target.value)}
+              style={{fontSize:12,padding:'4px 8px',border:'1px solid #cbd5e1',borderRadius:6}} />
+            <span style={{fontSize:12,color:'#94a3b8'}}>to</span>
+            <input type="date" value={customTo} onChange={e=>setCustomTo(e.target.value)}
+              style={{fontSize:12,padding:'4px 8px',border:'1px solid #cbd5e1',borderRadius:6}} />
+          </>
+        )}
+        <div style={{flex:1}}/>
+        <button onClick={()=>window.print()}
+          style={{padding:'6px 16px',borderRadius:6,border:'1px solid #cbd5e1',background:'#fff',
+                  fontSize:12,fontWeight:500,cursor:'pointer',color:'#475569',display:'flex',alignItems:'center',gap:6}}>
+          🖨 Print / PDF
+        </button>
+      </div>
+
+      {/* Period label */}
+      <div style={{fontSize:13,fontWeight:700,color:'#1e293b',marginBottom:16}}>
+        Reporting Period: <span style={{color:'#2563eb'}}>{periodLabel}</span>
+        <span style={{fontSize:11,fontWeight:400,color:'#94a3b8',marginLeft:12}}>
+          {fAll} CAR{fAll!==1?'s':''} in period · {cars.length} total all time
+        </span>
+      </div>
+
+      {/* QP-04 KPI cards */}
+      <div className="mr-kpi-row" style={{display:'flex',gap:12,marginBottom:20,flexWrap:'wrap'}}>
+
+        <div style={kpiBox(onTimePct===null?null:onTimePct>=85)}>
+          <div style={{fontSize:11,fontWeight:700,color:'#94a3b8',textTransform:'uppercase',letterSpacing:'.06em'}}>On-Time Closure Rate</div>
+          <div style={{fontSize:28,fontWeight:800,color:onTimePct===null?'#94a3b8':onTimePct>=85?'#16a34a':'#dc2626',lineHeight:1.1}}>
+            {onTimePct===null?'—':`${onTimePct}%`}
+          </div>
+          <div style={{fontSize:11,color:'#64748b'}}>Target: ≥ 85% · {fDone} closed/cancelled in period</div>
+          {onTimePct!==null && onTimePct<85 &&
+            <div style={{fontSize:11,color:'#dc2626',fontWeight:600}}>⚠ Below target ({85-onTimePct}pp gap)</div>}
+        </div>
+
+        <div style={kpiBox(avgDays===null?null:avgDays<=30)}>
+          <div style={{fontSize:11,fontWeight:700,color:'#94a3b8',textTransform:'uppercase',letterSpacing:'.06em'}}>Avg Days to Close</div>
+          <div style={{fontSize:28,fontWeight:800,color:avgDays===null?'#94a3b8':avgDays<=30?'#16a34a':avgDays<=60?'#d97706':'#dc2626',lineHeight:1.1}}>
+            {avgDays===null?'—':`${avgDays}d`}
+          </div>
+          <div style={{fontSize:11,color:'#64748b'}}>Target: &lt;30d Corrective · &lt;60d Preventive</div>
+          {avgDays!==null && avgDays>30 && avgDays<=60 &&
+            <div style={{fontSize:11,color:'#d97706',fontWeight:600}}>⚠ Exceeds Corrective target</div>}
+          {avgDays!==null && avgDays>60 &&
+            <div style={{fontSize:11,color:'#dc2626',fontWeight:600}}>⚠ Exceeds all targets</div>}
+        </div>
+
+        <div style={kpiBox(aOpen<=10)}>
+          <div style={{fontSize:11,fontWeight:700,color:'#94a3b8',textTransform:'uppercase',letterSpacing:'.06em'}}>Open CAR Backlog</div>
+          <div style={{fontSize:28,fontWeight:800,color:aOpen<=10?'#16a34a':aOpen<=15?'#d97706':'#dc2626',lineHeight:1.1}}>{aOpen}</div>
+          <div style={{fontSize:11,color:'#64748b'}}>Target: &lt;10 open · {aNew} awaiting assignment</div>
+          {aOpen>10 && <div style={{fontSize:11,color:aOpen<=15?'#d97706':'#dc2626',fontWeight:600}}>⚠ Above target ({aOpen-10} excess)</div>}
+        </div>
+
+        <div style={kpiBox(aOD===0)}>
+          <div style={{fontSize:11,fontWeight:700,color:'#94a3b8',textTransform:'uppercase',letterSpacing:'.06em'}}>Overdue CARs</div>
+          <div style={{fontSize:28,fontWeight:800,color:aOD===0?'#16a34a':aOD<=3?'#d97706':'#dc2626',lineHeight:1.1}}>{aOD}</div>
+          <div style={{fontSize:11,color:'#64748b'}}>Open CARs past due date · all time</div>
+          {aOD>0 && <div style={{fontSize:11,color:aOD<=3?'#d97706':'#dc2626',fontWeight:600}}>⚠ Action required</div>}
+        </div>
+
+      </div>
+
+      {/* Executive Summary + Charts */}
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16,marginBottom:16}}>
+
+        {/* Executive Summary — visual redesign */}
+        <div style={card}>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14}}>
+            <div style={cardHdr}>Executive Summary</div>
+            <div style={{display:'flex',gap:16}}>
+              <div style={{fontSize:10,color:'#94a3b8',display:'flex',alignItems:'center',gap:4}}>
+                <span style={{width:10,height:10,borderRadius:2,background:'#e2e8f0',display:'inline-block'}}/>All Time
+              </div>
+              <div style={{fontSize:10,color:'#2563eb',display:'flex',alignItems:'center',gap:4}}>
+                <span style={{width:10,height:10,borderRadius:2,background:'#2563eb',display:'inline-block'}}/>Period
+              </div>
+            </div>
+          </div>
+
+          {/* Volume section */}
+          <div style={{fontSize:10,fontWeight:700,color:'#94a3b8',textTransform:'uppercase',letterSpacing:'.07em',marginBottom:6,paddingLeft:2}}>Volume</div>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:14}}>
+            <div style={{background:'#f8fafc',borderRadius:8,padding:'10px 14px',borderLeft:'3px solid #2563eb'}}>
+              <div style={{fontSize:10,color:'#64748b',fontWeight:600,marginBottom:2}}>Total Filed</div>
+              <div style={{display:'flex',alignItems:'baseline',gap:8}}>
+                <span style={{fontSize:24,fontWeight:800,color:'#1e293b'}}>{fAll}</span>
+                <span style={{fontSize:12,color:'#94a3b8'}}>/ {aAll} all time</span>
+              </div>
+              <div style={{fontSize:10,color:'#94a3b8',marginTop:1}}>
+                {spanMonths ? (fAll/spanMonths).toFixed(1) : fAll} / mo this period · {(aAll/allSpanMo).toFixed(1)} / mo all time
+              </div>
+            </div>
+            <div style={{background:'#f8fafc',borderRadius:8,padding:'10px 14px',borderLeft:'3px solid #7c3aed'}}>
+              <div style={{fontSize:10,color:'#64748b',fontWeight:600,marginBottom:2}}>Open Backlog</div>
+              <div style={{display:'flex',alignItems:'baseline',gap:8}}>
+                <span style={{fontSize:24,fontWeight:800,color:aOpen>10?'#dc2626':'#16a34a'}}>{aOpen}</span>
+                <span style={{fontSize:12,color:'#94a3b8'}}>open</span>
+              </div>
+              {aOpen > 0 && (
+                <div style={{marginTop:4,height:4,background:'#e2e8f0',borderRadius:4,overflow:'hidden'}}>
+                  <div style={{height:'100%',width:`${Math.min(100,Math.round(aClosed/(aAll||1)*100))}%`,background:'#16a34a',borderRadius:4}}/>
+                </div>
+              )}
+              <div style={{fontSize:10,color:'#94a3b8',marginTop:2}}>{aDoneArr.length} closed/cancelled · {Math.round(aDoneArr.length/(aAll||1)*100)}% resolution rate</div>
+            </div>
+          </div>
+
+          {/* Status section */}
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:6}}>
+            <div style={{fontSize:10,fontWeight:700,color:'#94a3b8',textTransform:'uppercase',letterSpacing:'.07em',paddingLeft:2}}>Status Breakdown</div>
+            <button onClick={()=>setShowStatus(s=>!s)} style={{fontSize:10,color:'#2563eb',background:'none',border:'none',cursor:'pointer',padding:'0 2px',fontWeight:500}}>
+              {showStatus ? '▲ Hide' : '▼ Show'}
+            </button>
+          </div>
+          {showStatus && <table style={{width:'100%',borderCollapse:'collapse',marginBottom:14}}>
+            <thead>
+              <tr>
+                <th style={{padding:'4px 8px',fontSize:10,fontWeight:700,color:'#94a3b8',textAlign:'left',borderBottom:'1px solid #e2e8f0'}}></th>
+                <th style={{padding:'4px 8px',fontSize:10,fontWeight:700,color:'#94a3b8',textAlign:'center',borderBottom:'1px solid #e2e8f0',width:70}}>All Time</th>
+                <th style={{padding:'4px 8px',fontSize:10,fontWeight:700,color:'#2563eb',textAlign:'center',borderBottom:'1px solid #e2e8f0',width:70}}>Period</th>
+                <th style={{padding:'4px 8px',fontSize:10,fontWeight:700,color:'#94a3b8',textAlign:'center',borderBottom:'1px solid #e2e8f0',width:40}}></th>
+              </tr>
+            </thead>
+            <tbody>
+              {[
+                { label:'Awaiting Assignment', icon:'🕐', aVal:aNew,  fVal:fNew,  warn: v=>v>0 },
+                { label:'Overdue',             icon:'🔴', aVal:aOD,   fVal:fOD,   warn: v=>v>0,  crit:true },
+                { label:'Processed Late',      icon:'⏱', aVal:aLate, fVal:fLate, warn: v=>v>0 },
+                { label:'Awaiting Verification',icon:'🔍',aVal:aUR,  fVal:fUR,   warn: v=>false },
+                { label:'Failed Verification', icon:'✗',  aVal:aFail, fVal:fFail, warn: v=>v>0,  crit:true },
+                { label:'Passed Verification', icon:'✓',  aVal:aPass, fVal:fPass, warn: v=>false, good:true },
+              ].map(({label,icon,aVal,fVal,warn,crit,good}) => (
+                <tr key={label} style={{background:'transparent'}}>
+                  <td style={{padding:'4px 8px',fontSize:12,color:'#475569',borderBottom:'1px solid #f8fafc',display:'flex',alignItems:'center',gap:6}}>
+                    <span style={{fontSize:11}}>{icon}</span>{label}
+                  </td>
+                  <td style={{padding:'4px 8px',fontSize:12,fontWeight:500,textAlign:'center',borderBottom:'1px solid #f8fafc',color:'#64748b'}}>{aVal}</td>
+                  <td style={{padding:'4px 8px',fontSize:13,fontWeight:700,textAlign:'center',borderBottom:'1px solid #f8fafc',
+                    color: fVal===0?(good?'#16a34a':'#94a3b8'):warn(fVal)?(crit?'#dc2626':'#d97706'):'#1e293b'}}>{fVal}</td>
+                  <td style={{padding:'4px 8px',textAlign:'center',borderBottom:'1px solid #f8fafc'}}>
+                    {fVal>0 && warn(fVal) && <span style={{fontSize:11,color:crit?'#dc2626':'#d97706'}}>⚠</span>}
+                    {fVal===0 && good && <span style={{fontSize:11,color:'#16a34a'}}>✓</span>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>}
+
+          {/* Categories section */}
+          <div style={{fontSize:10,fontWeight:700,color:'#94a3b8',textTransform:'uppercase',letterSpacing:'.07em',marginBottom:6,paddingLeft:2}}>Categories</div>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6}}>
+            {[
+              { label:'Customer-Related', aVal:aCust, fVal:fCust, color:'#0891b2' },
+              { label:'Employee Proactive', aVal:aPrev, fVal:fPrev, color:'#16a34a' },
+            ].map(({label,aVal,fVal,color}) => (
+              <div key={label} style={{background:'#f8fafc',borderRadius:6,padding:'8px 12px',borderLeft:`3px solid ${color}`}}>
+                <div style={{fontSize:10,color:'#64748b',fontWeight:600,marginBottom:2}}>{label}</div>
+                <div style={{display:'flex',alignItems:'baseline',gap:6}}>
+                  <span style={{fontSize:20,fontWeight:800,color}}>{fVal}</span>
+                  <span style={{fontSize:11,color:'#94a3b8'}}>/ {aVal} all time</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Monthly trend chart */}
+        <div style={card}>
+          <div style={cardHdr}>Monthly Submission Trend — {periodLabel}</div>
+          <div style={{fontSize:11,color:'#94a3b8',marginBottom:8}}>CARs filed per month · stacked by type</div>
+          <MrTrendChart cars={fCars} monthCount={Math.max(3, Math.min(24, monthCount))} />
+        </div>
+
+      </div>
+
+      {/* Source + Type charts */}
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16,marginBottom:16}}>
+        <div style={card}>
+          <div style={cardHdr}>CARs by Source — {periodLabel}</div>
+          <div style={{fontSize:11,color:'#94a3b8',marginBottom:8}}>ISO 9001 §10.2 input analysis</div>
+          <MrSourceChart cars={fCars} />
+        </div>
+        <div style={card}>
+          <div style={cardHdr}>CARs by Type — {periodLabel}</div>
+          <div style={{fontSize:11,color:'#94a3b8',marginBottom:8}}>Corrective / Preventive / OFI breakdown</div>
+          <MrTypeChart cars={fCars} />
+        </div>
+      </div>
+
+      {/* By Process breakdown table */}
+      <div style={card}>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
+          <div style={cardHdr}>CARs by Process — {periodLabel}</div>
+          <span style={{fontSize:11,color:'#94a3b8'}}>{procBreakdown.length} process{procBreakdown.length!==1?'es':''} with CARs</span>
+        </div>
+        {procBreakdown.length === 0 ? (
+          <div style={{fontSize:13,color:'#94a3b8',padding:'20px 0',textAlign:'center'}}>No CARs in this period.</div>
+        ) : (
+          <div style={{overflowX:'auto'}}>
+            <table style={{width:'100%',borderCollapse:'collapse',fontSize:12.5}}>
+              <thead>
+                <tr style={{background:'#f8fafc'}}>
+                  <th style={{padding:'7px 12px',textAlign:'left',fontWeight:700,color:'#475569',borderBottom:'2px solid #e2e8f0'}}>Process</th>
+                  <th style={{padding:'7px 12px',textAlign:'center',fontWeight:700,color:'#475569',borderBottom:'2px solid #e2e8f0',width:70}}>Total</th>
+                  <th style={{padding:'7px 12px',textAlign:'center',fontWeight:600,color:'#2563eb',borderBottom:'2px solid #e2e8f0',width:90}}>Corrective</th>
+                  <th style={{padding:'7px 12px',textAlign:'center',fontWeight:600,color:'#7c3aed',borderBottom:'2px solid #e2e8f0',width:90}}>Preventive</th>
+                  <th style={{padding:'7px 12px',textAlign:'center',fontWeight:600,color:'#0891b2',borderBottom:'2px solid #e2e8f0',width:60}}>OFI</th>
+                </tr>
+              </thead>
+              <tbody>
+                {procBreakdown.map(([proc, d], i) => (
+                  <tr key={proc} style={{background:i%2===0?'#fff':'#f8fafc'}}>
+                    <td style={{padding:'6px 12px',color:'#1e293b',borderBottom:'1px solid #f1f5f9'}}>{proc||'—'}</td>
+                    <td style={{padding:'6px 12px',textAlign:'center',fontWeight:700,borderBottom:'1px solid #f1f5f9'}}>{d.total}</td>
+                    <td style={{padding:'6px 12px',textAlign:'center',color:'#2563eb',borderBottom:'1px solid #f1f5f9'}}>{d.C||'—'}</td>
+                    <td style={{padding:'6px 12px',textAlign:'center',color:'#7c3aed',borderBottom:'1px solid #f1f5f9'}}>{d.P||'—'}</td>
+                    <td style={{padding:'6px 12px',textAlign:'center',color:'#0891b2',borderBottom:'1px solid #f1f5f9'}}>{d.O||'—'}</td>
+                  </tr>
+                ))}
+                <tr style={{background:'#f1f5f9',fontWeight:700}}>
+                  <td style={{padding:'7px 12px',borderTop:'2px solid #e2e8f0'}}>TOTAL</td>
+                  <td style={{padding:'7px 12px',textAlign:'center',borderTop:'2px solid #e2e8f0'}}>{procBreakdown.reduce((s,[,d])=>s+d.total,0)}</td>
+                  <td style={{padding:'7px 12px',textAlign:'center',color:'#2563eb',borderTop:'2px solid #e2e8f0'}}>{procBreakdown.reduce((s,[,d])=>s+d.C,0)||'—'}</td>
+                  <td style={{padding:'7px 12px',textAlign:'center',color:'#7c3aed',borderTop:'2px solid #e2e8f0'}}>{procBreakdown.reduce((s,[,d])=>s+d.P,0)||'—'}</td>
+                  <td style={{padding:'7px 12px',textAlign:'center',color:'#0891b2',borderTop:'2px solid #e2e8f0'}}>{procBreakdown.reduce((s,[,d])=>s+d.O,0)||'—'}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      <div style={{fontSize:11,color:'#94a3b8',paddingBottom:32,textAlign:'right'}}>
+        ASI Product PPS · QP-04 Nonconformance and Corrective Action · Report generated {reportDate}
+      </div>
+    </div>
+  );
+}
+
+/* ── App Shell ───────────────────────────────────────────────── */
+function App() {
+  const [tab, setTab] = useState(() => {
+    try { const p = new URLSearchParams(window.location.search); if (p.get('owner')) return 'mine'; }
+    catch(_) {}
+    return 'dash';
+  });
+  const [cars,          setCars]          = useState(CARS);
+  const [fetchedAt,     setFetchedAt]     = useState(null);
+  const [columns,       setColumns]       = useState({});
+  const [selectedCarId, setSelectedCarId] = useState(null);
+  const [userMap,       setUserMap]       = useState({});
+  const [currentUser,   setCurrentUser]   = useState('');
+  const liveMode = cars !== CARS;
+
+  // selectedCAR always reflects the latest version from the cars array
+  const selectedCAR = selectedCarId ? (cars.find(c => String(c.id) === String(selectedCarId)) || null) : null;
+
+  useEffect(() => {
+    _onDataLoad = (json) => {
+      const mapped = (json.items || []).map(f => mapSPFields(f, json.columns));
+      setCars(mapped.length ? mapped : CARS);
+      setFetchedAt(json.fetchedAt || null);
+      setColumns(json.columns || {});
+      if (json.currentUser && json.currentUser.name) setCurrentUser(json.currentUser.name);
+    };
+    bootstrapApp();
+    // Fetch site users so we can resolve SharePoint user IDs to display names
+    fetch('/api/users').then(r=>r.json()).then(d=>{
+      const m = {};
+      (d.users||[]).forEach(u => { m[String(u.id)] = u.name; });
+      setUserMap(m);
+    }).catch(()=>{});
+    // currentUser is now included in /api/data (fetched server-side after auth completes)
+    return () => { _onDataLoad = null; };
+  }, []);
+
+  // Re-fetch data after a save (server re-fetches in background; wait ~2s for it to finish)
+  const refreshData = async () => {
+    try {
+      // Poll every second until server returns fresh data (fetchedAt changes) or timeout at 12s
+      const prevAt = fetchedAt;
+      for (let i = 0; i < 12; i++) {
+        await new Promise(r => setTimeout(r, 1000));
+        const resp = await fetch('/api/data');
+        const json = await resp.json();
+        if (json.mode === 'live' && json.items && json.items.length &&
+            (json.fetchedAt !== prevAt || i >= 3)) {
+          const mapped = json.items.map(f => mapSPFields(f, json.columns));
+          setCars(mapped);
+          setColumns(json.columns || {});
+          setFetchedAt(json.fetchedAt || null);
+          return;
+        }
+      }
+    } catch(e) { console.error('Refresh failed:', e); }
+  };
+
+  const odCount = cars.filter(isOD).length;
+
+  return (
+    <div>
+      <div className="hdr">
+        <div className="hdr-l">
+          <div className="hdr-mark">ASI</div>
+          <div>
+            <div className="hdr-title">CAPA Management Dashboard</div>
+            <div className="hdr-sub">ASI Product PPS &nbsp;·&nbsp; QP-04 Nonconformance &amp; Corrective Action</div>
+          </div>
+        </div>
+        <div style={{display:'flex',alignItems:'center',gap:10}}>
+          <span style={{fontSize:11.5,color:'#93c5fd'}}>Mar 24, 2026</span>
+          <div className="hdr-badge" style={liveMode ? {background:'rgba(22,163,74,.25)',borderColor:'rgba(22,163,74,.5)',color:'#bbf7d0'} : {}}>{liveMode ? '⚡ Live — SharePoint' : 'Phase 1 Prototype'}</div>
+        </div>
+      </div>
+
+      <div className="nav">
+        <button className={`nav-btn ${tab==='dash'?'on':''}`} onClick={()=>setTab('dash')}>
+          📊 Dashboard
+        </button>
+        <button className={`nav-btn ${tab==='log'?'on':''}`} onClick={()=>setTab('log')}>
+          📋 CAR Log
+          {odCount>0 && <span className="nbadge">{odCount}</span>}
+        </button>
+        <button className={`nav-btn ${tab==='submit'?'on':''}`} onClick={()=>setTab('submit')}>
+          📝 Submit CAR
+        </button>
+        <button className={`nav-btn ${tab==='mine'?'on':''}`} onClick={()=>setTab('mine')}>
+          📥 My CARs
+        </button>
+        <button className={`nav-btn ${tab==='review'?'on':''}`} onClick={()=>setTab('review')}>
+          📊 Mgmt Review
+        </button>
+      </div>
+
+      <div className="main">
+        {tab==='dash' && <Dashboard cars={cars} liveMode={liveMode} fetchedAt={fetchedAt} onSelect={id=>setSelectedCarId(id)} onSubmitCar={()=>setTab('submit')} />}
+        {tab==='log'    && <CARLog       cars={cars} liveMode={liveMode} onSelect={id=>setSelectedCarId(id)} />}
+        {tab==='submit' && <SubmitCARTab cars={cars} liveMode={liveMode} onSubmitted={refreshData} currentUser={currentUser} />}
+        {tab==='mine'   && <AssigneeCARsTab cars={cars} liveMode={liveMode} currentUser={currentUser} onRefresh={refreshData} />}
+        {tab==='review' && <MgmtReviewTab   cars={cars} liveMode={liveMode} />}
+      </div>
+
+      <div className="footer">
+        ASI Product PPS · CAPA Management System · QP-04 Nonconformance and Corrective Action · {liveMode ? 'Phase 4 — Full workflow forms · Submit CAR · Live SharePoint read/write' : 'Phase 1 Prototype — sample data only'}
+      </div>
+
+      {/* CAR Detail Drawer */}
+      {selectedCAR && (
+        <CARDrawer
+          car={selectedCAR}
+          liveMode={liveMode}
+          onClose={() => setSelectedCarId(null)}
+          onSave={refreshData}
+          carList={cars}
+          currentIdx={cars.findIndex(c => String(c.id) === String(selectedCarId))}
+          onNavigate={id => setSelectedCarId(id)}
+          userMap={userMap}
+        />
+      )}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
