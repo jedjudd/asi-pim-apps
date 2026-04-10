@@ -462,7 +462,7 @@ let _onDataLoad = null;   // callback set by React app
 // ═══════════════════════════════════════════════════════════════════════════
 const _MSAL_CONFIG = {
   auth: {
-    clientId: '9bc3ab49-b65d-410a-85ad-de819febfddc', // SharePoint Management Shell — pre-consented in all M365 tenants
+    clientId: '99c832f3-a882-49c3-bbae-f8ca152e34b3', // ASI PIM Dashboard app registration
     authority: 'https://login.microsoftonline.com/794c042e-da02-4688-96e8-1ddf59b497ff',
     redirectUri: 'https://jedjudd.github.io/',
   },
@@ -473,7 +473,7 @@ const _SCOPES   = [
   'https://autonomoussolutions.sharepoint.com/AllSites.Write'
 ];
 const _SP_SITE  = 'https://autonomoussolutions.sharepoint.com/sites/productppps';
-const _SP_LIST  = 'CAR Log';
+const _SP_LIST  = 'QF-10 CAPA Log';
 let   _entityType = null;  // cached on first write
 let _msalInstance = null;
 const _origFetch  = window.fetch.bind(window);
