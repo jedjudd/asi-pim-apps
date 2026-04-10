@@ -462,7 +462,7 @@ let _onDataLoad = null;   // callback set by React app
 // ═══════════════════════════════════════════════════════════════════════════
 const _MSAL_CONFIG = {
   auth: {
-    clientId: '99c832f3-a882-49c3-bbae-f8ca152e34b3',  // ← Paste your Azure AD App client ID here
+    clientId: '9bc3ab49-b65d-410a-85ad-de819febfddc'  // SharePoint Online Management Shell — pre-consented in all M365 tenants,  // ← Paste your Azure AD App client ID here
     authority: 'https://login.microsoftonline.com/794c042e-da02-4688-96e8-1ddf59b497ff',
     redirectUri: 'https://jedjudd.github.io/',
   },
@@ -2699,7 +2699,18 @@ function App() {
       setColumns(json.columns || {});
       if (json.currentUser && json.currentUser.name) setCurrentUser(json.currentUser.name);
     };
-    bootstrapApp();
+    // Retry loop: esm.sh dynamic import may not resolve on first call
+    (async () => {
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+          await bootstrapApp();
+          break;
+        } catch(e) {
+          console.warn('[CAPA] bootstrapApp attempt', attempt, 'failed:', e.message);
+          if (attempt < 3) await new Promise(r => setTimeout(r, attempt * 800));
+        }
+      }
+    })();
     // Fetch site users so we can resolve SharePoint user IDs to display names
     fetch('/api/users').then(r=>r.json()).then(d=>{
       const m = {};
