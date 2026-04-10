@@ -1709,11 +1709,13 @@ function processDcmBuffer(buf, fileName) {
 //   → API permissions: Microsoft Graph → Sites.Read.All + Sites.ReadWrite.All (delegated)
 //   → Copy the Application (client) ID and paste below as 99c832f3-a882-49c3-bbae-f8ca152e34b3
 // ═══════════════════════════════════════════════════════════════════════════
+const IS_LIVE = window.location.protocol === 'https:';
+
 const _MSAL_CONFIG = {
   auth: {
     clientId: '99c832f3-a882-49c3-bbae-f8ca152e34b3',  // ← Paste your Azure AD App client ID here
     authority: 'https://login.microsoftonline.com/794c042e-da02-4688-96e8-1ddf59b497ff',
-    redirectUri: 'https://autonomoussolutions.sharepoint.com/sites/productppps/_layouts/15/blank.aspx',
+    redirectUri: 'https://jedjudd.github.io/',
   },
   cache: { cacheLocation: 'sessionStorage', storeAuthStateInCookie: true }
 };
@@ -1826,17 +1828,29 @@ async function _msalLoadData() {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
-  await _getMsal(); // sets up fetch interceptor before any React/JS renders
-  const inst     = await _getMsal();
-  const accounts = inst.getAllAccounts();
-  if (accounts.length > 0) {
-    // Previously signed in — try silent refresh
-    setAuthStep('starting');
-    document.getElementById('auth-connecting-msg').textContent = 'Reconnecting to SharePoint…';
-    await _msalLoadData();
-  } else {
-    // First visit — show sign-in prompt
-    setAuthStep('device');
+  if (!IS_LIVE) {
+    // Opened as a local file — hide auth overlay and load demo/offline mode
+    document.getElementById('auth-overlay').classList.add('hidden');
+    return;
+  }
+  try {
+    await _getMsal(); // sets up fetch interceptor
+    const inst     = await _getMsal();
+    const accounts = inst.getAllAccounts();
+    if (accounts.length > 0) {
+      // Previously signed in — try silent refresh
+      setAuthStep('starting');
+      document.getElementById('auth-connecting-msg').textContent = 'Reconnecting to SharePoint…';
+      await _msalLoadData();
+    } else {
+      // First visit — show sign-in prompt
+      setAuthStep('device');
+    }
+  } catch(e) {
+    console.error('MSAL init error:', e);
+    setAuthStep('error');
+    const errEl = document.getElementById('auth-error-msg');
+    if (errEl) errEl.textContent = 'Authentication error: ' + (e.message || e);
   }
 });
 
