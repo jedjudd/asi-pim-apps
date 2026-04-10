@@ -466,15 +466,15 @@ const _MSAL_CONFIG = {
     authority: 'https://login.microsoftonline.com/794c042e-da02-4688-96e8-1ddf59b497ff',
     redirectUri: 'https://jedjudd.github.io/',
   },
-  cache: { cacheLocation: 'sessionStorage', storeAuthStateInCookie: true }
+  cache: { cacheLocation: 'localStorage', storeAuthStateInCookie: true }
 };
-const _SCOPES = [
-  'https://graph.microsoft.com/Sites.Read.All',
-  'https://graph.microsoft.com/Sites.ReadWrite.All'
+const _SCOPES   = [
+  'https://autonomoussolutions.sharepoint.com/AllSites.Read',
+  'https://autonomoussolutions.sharepoint.com/AllSites.Write'
 ];
-const _SITE   = 'autonomoussolutions.sharepoint.com:/sites/productppps:';
-const _LIST   = 'CAR Log';
-
+const _SP_SITE  = 'https://autonomoussolutions.sharepoint.com/sites/productppps';
+const _SP_LIST  = 'CAR Log';
+let   _entityType = null;  // cached on first write
 let _msalInstance = null;
 const _origFetch  = window.fetch.bind(window);
 
@@ -513,73 +513,87 @@ async function _apiRouter(url, opts) {
   const ok = (d, status=200) => new Response(JSON.stringify(d), {
     status, headers: { 'Content-Type': 'application/json' }
   });
+  const spHeaders = async (extra={}) => ({
+    'Authorization': `Bearer ${await _getToken()}`,
+    'Accept': 'application/json;odata=nometadata',
+    ...extra
+  });
 
   try {
     if (url === '/api/auth-status') return ok({ status:'ready', label:'Microsoft 365' });
     if (url === '/api/skip-auth' || url === '/api/refresh') return ok({ ok:true });
 
-    if (url === '/api/me') {
+    if (url === '/api/me' || url === '/api/users') {
       const inst = await _getMsal();
       const acct = inst.getAllAccounts()[0];
-      return ok({ name: acct?.name || acct?.username || '' });
-    }
-
-    if (url === '/api/users') {
-      // Return current user; extend via Graph /users if you need the full org list
-      const inst = await _getMsal();
-      const acct = inst.getAllAccounts()[0];
-      return ok({ users: acct ? [{ id:0, name:acct.name, email:acct.username }] : [] });
+      const user = { id:0, name:acct?.name||acct?.username||'', email:acct?.username||'' };
+      return url === '/api/users' ? ok({ users:[user] }) : ok(user);
     }
 
     if (url === '/api/data') {
-      const token = await _getToken();
       const r = await _origFetch(
-        `https://graph.microsoft.com/v1.0/sites/${_SITE}/lists/${encodeURIComponent(_LIST)}/items?$expand=fields&$top=500`,
-        { headers: { Authorization: `Bearer ${token}` } }
+        `${_SP_SITE}/_api/web/lists/getbytitle('${_SP_LIST}')/items?$top=500&$orderby=Id`,
+        { headers: await spHeaders() }
       );
-      if (!r.ok) throw new Error('Graph HTTP ' + r.status);
+      if (!r.ok) throw new Error('SharePoint HTTP ' + r.status);
       const data  = await r.json();
-      const items = (data.value || []).map(i => ({ ...i.fields, _graphId: i.id }));
+      const items = (data.value||[]).map(i => ({ ...i, _graphId: String(i.Id) }));
       const cols  = {};
-      Object.keys(items[0] || {}).forEach(k => {
+      Object.keys(items[0]||{}).forEach(k => {
         cols[k] = k.replace(/_x0020_/g,' ').replace(/_x002e_/g,'.');
       });
       return ok({ mode:'live', items, columns:cols, fetchedAt: new Date().toISOString() });
     }
 
     if (url === '/api/update') {
-      const token = await _getToken();
       const { id, fields } = body;
+      if (!_entityType) {
+        const et = await _origFetch(
+          `${_SP_SITE}/_api/web/lists/getbytitle('${_SP_LIST}')?$select=ListItemEntityTypeFullName`,
+          { headers: await spHeaders() }
+        );
+        _entityType = (await et.json()).ListItemEntityTypeFullName;
+      }
       const r = await _origFetch(
-        `https://graph.microsoft.com/v1.0/sites/${_SITE}/lists/${encodeURIComponent(_LIST)}/items/${id}/fields`,
+        `${_SP_SITE}/_api/web/lists/getbytitle('${_SP_LIST}')/items(${id})`,
         {
-          method: 'PATCH',
-          headers: { Authorization:`Bearer ${token}`, 'Content-Type':'application/json' },
-          body: JSON.stringify(fields)
+          method: 'POST',
+          headers: await spHeaders({
+            'Content-Type': 'application/json;odata=verbose',
+            'X-HTTP-Method': 'MERGE',
+            'IF-MATCH': '*'
+          }),
+          body: JSON.stringify({ '__metadata':{ 'type': _entityType }, ...fields })
         }
       );
-      if (!r.ok) { const e=await r.json(); throw new Error(e.error?.message||'Update failed'); }
+      if (!r.ok && r.status !== 204) { const e=await r.text(); throw new Error('Update failed: '+e.substring(0,200)); }
       return ok({ ok:true });
     }
 
     if (url === '/api/submit') {
-      const token = await _getToken();
+      if (!_entityType) {
+        const et = await _origFetch(
+          `${_SP_SITE}/_api/web/lists/getbytitle('${_SP_LIST}')?$select=ListItemEntityTypeFullName`,
+          { headers: await spHeaders() }
+        );
+        _entityType = (await et.json()).ListItemEntityTypeFullName;
+      }
       const r = await _origFetch(
-        `https://graph.microsoft.com/v1.0/sites/${_SITE}/lists/${encodeURIComponent(_LIST)}/items`,
+        `${_SP_SITE}/_api/web/lists/getbytitle('${_SP_LIST}')/items`,
         {
           method: 'POST',
-          headers: { Authorization:`Bearer ${token}`, 'Content-Type':'application/json' },
-          body: JSON.stringify({ fields: body })
+          headers: await spHeaders({ 'Content-Type': 'application/json;odata=verbose' }),
+          body: JSON.stringify({ '__metadata':{ 'type': _entityType }, ...body })
         }
       );
-      if (!r.ok) { const e=await r.json(); throw new Error(e.error?.message||'Submit failed'); }
+      if (!r.ok) { const e=await r.text(); throw new Error('Submit failed: '+e.substring(0,200)); }
       const created = await r.json();
-      return ok({ ok:true, id:created.id, no:created.fields?.Title||'' });
+      return ok({ ok:true, id: String(created.Id||''), no: created.Title||'' });
     }
 
     return ok({ error:'Unknown route: '+url }, 404);
   } catch(e) {
-    console.error('[API Router]', url, e);
+    console.error('[CAPA API Router]', url, e);
     return ok({ error: e.message }, 500);
   }
 }
@@ -596,12 +610,12 @@ async function _loadLiveData(label) {
     const token = await _getToken();
     _setAuthStep('fetching');
     const r = await _origFetch(
-      `https://graph.microsoft.com/v1.0/sites/${_SITE}/lists/${encodeURIComponent(_LIST)}/items?$expand=fields&$top=500`,
-      { headers: { Authorization: `Bearer ${token}` } }
+      `${_SP_SITE}/_api/web/lists/getbytitle('${_SP_LIST}')/items?$top=500&$orderby=Id`,
+      { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json;odata=nometadata' } }
     );
-    if (!r.ok) throw new Error('Graph HTTP ' + r.status);
+    if (!r.ok) throw new Error('SharePoint HTTP ' + r.status);
     const data  = await r.json();
-    const items = (data.value || []).map(i => ({ ...i.fields, _graphId: i.id }));
+    const items = (data.value || []).map(i => ({ ...i, _graphId: String(i.Id) }));
     if (!items.length) throw new Error('No items returned from SharePoint CAR Log.');
     const cols  = {};
     Object.keys(items[0]).forEach(k => { cols[k] = k.replace(/_x0020_/g,' ').replace(/_x002e_/g,'.'); });
